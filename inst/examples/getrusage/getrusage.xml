@@ -1,0 +1,458 @@
+<?xml version="1.0"?>
+
+<article
+  xmlns:r="http://www.r-project.org"
+  xmlns:c="http://www.C.org"
+  xmlns:make="http://www.make.org"
+  xmlns:omg="http://www.omegahat.org"
+  xmlns:sh="http://www.shell.org">
+
+<para>
+We work from the getrusage.cc file that contains code 
+<c:code file="getrusage.cc">
+<![CDATA[
+#include <sys/time.h>
+#include <sys/resource.h>
+]]>
+</c:code>
+We then generate the tu file from this with
+<sh:code>
+g++ -fdump-translation-unit -c getrusage.cc -o /dev/null
+</sh:code>
+</para>
+
+<para>
+At this point, we are ready  to work with the contents of the TU file in R.
+We load the <omg:pkg>RGCCTranslation</omg:pkg> package and 
+parse the TU file.
+<r:code>
+library(RGCCTranslationUnit)
+g = parseTU("getrusage.cc.001t.tu",  language = "C")
+</r:code>
+
+</para>
+<para>
+One way to generate the interface is
+<r:code><![CDATA[
+iface = generateInterface(g, 
+                          outfile="Rgetrusage", 
+                          includes = c("<sys/time.h>",  "<sys/resource.h>", 
+                                       "<Rdefines.h>", '"RConverters.h"'),
+                          dataTypes = names(getEnumerations(g)))
+]]></r:code>
+If by chance we end up with a version that includes the 64 bit versions of these routines,
+we might want to filter the names of the routines:
+<r:code><![CDATA[
+routines = names(getRoutines(g))
+routines = routines[ - grep("64$", routines) ]
+iface = generateInterface(g, routines,
+                          outfile="Rgetrusage", 
+                          includes = c("<sys/time.h>",  "<sys/resource.h>", 
+                                       '"RConverters.h"'),
+                          dataTypes = names(getEnumerations(g)))
+]]></r:code>
+The use of <r:func>generateInterface</r:func> is  the  most convenient way to generate the code. 
+Note that we include all the enumerations as they will not be picked up
+as dependent data types  as they are not actually used within the 
+definitions of the routines. We can add others, but they will typically
+be included because they are referred to in one of the routines of interest.
+</para>
+<para>
+<r:code><![CDATA[
+iface = generateInterface(g, c("setpriority", "getpriority", "getrusage", "setrlimit", "getrlimit"),
+                          outfile="Rgetrusage", 
+                          includes = c("<sys/time.h>",  "<sys/resource.h>", 
+                                       "<Rdefines.h>", '"RConverters.h"'),
+                          dataTypes = names(getEnumerations(g)))
+]]></r:code>
+</para>
+
+<para>
+While <r:func>generateInterfac</r:func> is the most high-level 
+function to generate code,  we'll go through the details of what it does manually
+as this allows us to customize the interface at different points in the process.
+The code below provides a reasonably complete skeleton, but omits
+the fd_set structure at present. As a result, the resulting code will not compile as-is.
+One can add the support for fd_set as an exercise.
+</para>
+<para>
+We start by finding all the routines declared in these header files and
+resolve them to get a description entirely within R.
+A dictionary/catalog of all  the different types is
+created in the <r:var>types</r:var> environment as we traverse
+all the different declarations and definitions.
+<r:code>
+r = getRoutines(g)
+types = DefinitionContainer()
+rr = resolveType(r, g, types)
+</r:code>
+There are 18 routines as we can see from
+<r:code>
+names(rr)
+<r:output>
+ [1] "setpriority"  "getpriority"  "getrusage"    "setrlimit64"  "setrlimit"   
+ [6] "getrlimit64"  "getrlimit"    "futimesat"    "futimes"      "lutimes"     
+[11] "utimes"       "setitimer"    "getitimer"    "adjtime"      "settimeofday"
+[16] "gettimeofday" "pselect"      "select"      
+</r:output>
+</r:code>
+Each of the elements  in the list <r:var>rr</r:var> is an object
+of class <r:class>ResolvedNativeRoutine</r:class>
+and has information abot the name of the routine, its parameters
+and their types, the type of the return value.
+
+</para>
+
+<para>
+We want to generate the R and C code to interface to these routines and their
+associated  data types.
+<r:code>
+bindings = lapply(rr, createMethodBinding)
+
+rusage = generateStructInterface(types$rusage, types)
+timeval = generateStructInterface(types$timeval, types)
+</r:code>
+</para>
+<para>
+Now, we have all this code in memory in R and we want to put it into
+files that we can use in another session.  We use
+<r:func>writeCode</r:func> to serialize the generated code to a
+connection.  We specify whether we want the R or native code with the
+second argument, and specify the connection to which we want the code
+written.
+<r:code>
+cat("writing R code\n")
+con = file("/tmp/getrusage.R", "w")
+writeCode(timeval, "r", file = con )
+writeCode(rusage, "r", file = con )
+writeCode( bindings, "r", file = con )
+close(con)
+</r:code>
+</para>
+
+<para>
+Writing the C code to a file is very similar.  We use "native" for the
+second argument to specify that we want the C code.  We do want to add
+some additional code that includes the relevant headers files that are
+needed for the generated code to make sense. We do this either with an
+explicit call to <r:func>writeIncludes</r:func>, e.g.
+<r:expr><![CDATA[writeIncludes(c("<sys/time.h>", "<sys/resource.h>",
+"<Rdefines.h>", '"RConverters.h"'), con)]]></r:expr> or by specifying
+this vector of included files to the call to
+<r:func>writeCode</r:func> via the <r:arg>includes</r:arg> parameter.
+<r:code><![CDATA[
+cat("writing C code\n")
+con = file("/tmp/getrusage.c", "w")
+writeCode(timeval, "native", file = con, 
+              includes = c("<sys/time.h>",  "<sys/resource.h>", 
+                           "<Rdefines.h>", '"RConverters.h"'))
+writeCode(rusage, "native", file = con )
+writeCode(bindings, "native", file = con )
+close(con)
+]]>
+</r:code>
+</para>
+
+<para>
+Now, at this point, we want to see how these work.  We need to first
+compile the C code into a shared library.  The
+<file>RConverters.h</file> we included provides a lot of macros and
+definitions for the generated code to work and that is used by all
+generated code. So we need to specify where that is located or else
+simply create a copy of the file in the same directory as our
+<file>getrusage.c</file> file.  It is available from the
+RAutoGenRunTime package in its <dir>include</dir> directory.  It is
+definitely simplest to copy the file. However, any changes will not be
+propogated so one has to be careful. 
+And we also need to RConverters.c file from that package.
+But assuming we copy both of these files to the same directory
+as our generated getrusage.c file, we can use the shell command
+<sh:code>
+R CMD SHLIB getrusage.c RConverters.c
+</sh:code>
+to create our shared object/DLL.
+</para>
+
+<para>
+Instead, it is better to specify
+where the compiler can find this file.  If we want to use R's
+<sh:prog>SHLIB</sh:prog>, we need to specify additional include
+directories.  If this code is to be part of a package, we can add the
+relevant -I to the <file>src/Makevars</file> file although we have to
+determine at installation time where the RAutoGenRunTime package is.
+If the code is for our own private use and we don't want to create a
+Makevars directory for compiling this code, we can specify the include
+directory in the file <file>~/.R/Makevars</file> with
+a line something like
+<make:code>
+PKG_CPPFLAGS+=-I$(HOME)/Rpackage/RAutoGenRunTime/include
+</make:code>
+where you replace the precise location to one that is appropriate
+for your system.
+</para>
+
+<para>
+With the include directories set, we can compile the C source code  with
+<sh:code>
+R CMD SHLIB getrusage.c
+</sh:code>
+or similarly from within R
+<r:code>
+system("R CMD SHLIB getrusage.c")
+</r:code>
+</para>
+
+<para>
+Now we can dynamically load this code with
+<r:code>
+library(RAutoGenRunTime)
+dyn.load("Rgetrusage.so")
+</r:code>
+And we also need to bring in the R code
+<r:code>
+source("getrusage.R")
+</r:code>
+</para>
+
+<para>
+This is all just one time setup. We are now ready to use the code
+as a regular user would having loaded the relevant package.
+The first argument appears to be an 'int' both from
+the code and also the man page.
+However, when we read the man page, we see that it is either
+RUSAGE_SELF or RUSAGE_CHILDREN.
+We need the value of RUSAGE_SELF and RUSAGE_CHILDREN 
+within R to be able to make these calls.
+Where are these defined? 
+They are most likely part of an enumeration or
+a preprocessor #define. We can gather up all the enumeration
+definitions with 
+<r:code>
+enums = computeGlobalEnumConstants(g, defs = types)
+</r:code>
+Now we can see if any of these contain
+RUSAGE_SELF
+<r:code>
+lapply(enums, function(x) "RUSAGE_SELF" %in% names(x@values))
+</r:code>
+and we see __rusage_who does.
+If we look at the documentation for the resource.h
+header file on Linux, we see that this parameter 
+is defined as an int in the standards, but if
+we use a regular GNU C (not C++) parser, then
+we get the more precise/constrained definition with
+an __rusage_who type. So if we had used gcc rather than
+g++ to generate the TU file, we would have this information.
+And similarly, the bindings would have induced the definition
+of the enumerations by refering to that type.<note>Check this is implemented</note>
+</para>
+
+<para>
+Now that we know this, we should add the definition
+for the corresponding R variables to the 
+generated R code. We do this with
+<r:code>
+writeCode(enums, "r", con)
+</r:code>
+or if we just want the __rusage_who type,
+<r:code>
+writeCode(enums$"__rusage_who", "r", con)
+</r:code>
+where <r:var>con</r:var> is the connection to which 
+we are writing the generated R code.
+</para>
+
+<para>
+So again, we are finally ready to call the function.
+We load the code:
+<r:code>
+library(RAutoGenRunTime)
+source("/tmp/getrusageEnums.R")
+source("/tmp/getrusage.R")
+dyn.load("/tmp/getrusage.so")
+</r:code>
+</para>
+<para>
+We can can invoke the <r:func>getrusage</r:func> function
+directly as 
+<r:code>
+status = getrusage(RUSAGE_SELF)
+</r:code>
+This returns a list with a .result element giving 
+the status and a reference to an native/C-level 
+rusage  data structure.
+We can check things worked properly by comparing .result value to 0;
+if it is -1, the call  failed. 
+</para>
+<para>
+Alternatively, we can create the C-level rusage structure which will hold the result
+as a separate first step:
+<r:code>
+ru = new_rusage()
+</r:code>
+Then we call the function with 
+<r:code>
+status = getrusage(RUSAGE_SELF, ru)
+</r:code>
+
+</para>
+
+
+<para>
+The reference rusage object in C
+contains the results from the call.
+We can fetch the value of an individual field 
+with commands such as
+<r:code>
+ru$ru_utime
+ru$ru_stime
+</r:code>
+And we can get all of the fields into an R object
+at once  with 
+<r:code>
+ usage = as(ru, "rusage")
+</r:code>
+which converts the reference to the C-level rusage
+structure to an instance of the corresponding R 
+class, <r:class>rusage</r:class>.
+We can then access the values via the R slots
+whose names correspond to the fields in the 
+C-level structure, e.g.
+<r:code>
+r@ru_utime
+r@ru_stime
+</r:code>
+</para>
+
+
+<para>
+Of course, in the call to <r:expr eval="false">as(ru,
+"rusage")</r:expr>, one has to know the name of the R class to which
+to coerce the reference, i.e. <r:class>rusage</r:class>.  While this
+is quite simple, we can alleviate this problem by having a generic
+function that does this and it is named <r:func>copyToR</r:func>.
+This can be used as 
+<r:code>
+copyToR(ru)
+</r:code>
+and we get the same result.
+</para>
+
+<para>
+Let's look at <r:func>gettimeofday</r:func> next.
+We can call it and get the results back as regular R objecs with
+<r:code>
+gettimeofday( .copy = c(TRUE, TRUE))
+</r:code>
+
+</para>
+
+<para>
+<r:code>
+getpriority(PRIO_PROCESS, PRIO_PROCESS)
+getpriority(PRIO_PROCESS, PRIO_USER)
+</r:code>
+</para>
+<para>
+<r:code>
+getrlimit(RLIMIT_CORE, .copy = TRUE)
+z = sapply(`__rlimit_resourceValues`, function(i) getrlimit(i, .copy = TRUE)[[2]])
+</r:code>
+
+
+In this example, we reuse the same C-level instance to get the result and then copy it to R.
+<r:code>
+tmp = new_rlimit()
+z = sapply(`__rlimit_resourceValues`, function(i) getrlimit(i, tmp, .copy = TRUE)[[2]])
+</r:code>
+
+And here we are looking for the resources that are currently non-zero.
+So we use the same rlimit data structure for each call and don't copy
+it back  to R. Then we can look at its rlim_cur field.
+<r:code>
+tmp = new_rlimit()
+z = sapply(`__rlimit_resourceValues`, 
+            function(i) {
+                getrlimit(i, tmp)
+                tmp$rlim_cur > 0
+            })
+</r:code>
+The key idea is that <r:var>tmp</r:var> is being changed in each call to
+<r:func>getrlimit</r:func>. This is a very un-S-like style of computation,
+but feasible when interfacing with C, for better or worse!
+</para>
+
+<section>
+<title>Improving the interface</title>
+<para>
+If we look at the documentation for the
+<c:routine>getrusage</c:routine> routine, we know that the second
+argument is only for returning the result. This is an example of a
+pure "out" argument.  See <ulink url="outargs.xml"/> for more details.
+It would be more convenient if we knew this and generated the R
+function <r:func>getrusage</r:func> so that it either had a default
+value for the second parameter which was a newly created reference to
+a C-level rusage structure, or if it just omitted the second parameter
+and created this internally.  In either case, it would have to return
+both the regular return value - the integer - from the
+<c:routine>getrusage</c:routine> call and also the reference to the
+struct.
+The <r:func>createMethodBinding</r:func> function knows how to deal
+with these "out" parameters and can create suitable code.<note>Which version?</note>
+</para>
+
+<para>
+Unfortunately, the fact that this is an out variable is not information we can infer from
+the header files. If we had the raw source code, we might
+be able to detect this.  But since we don't, we have to specify it
+manually. There are two ways.
+</para>
+
+<para>
+We can generate the bindings for all the functions and deal
+with getrusage separately.
+We can then explicitly call 
+createMethodBinding with the resolved routine
+description (in <r:var>rr</r:var>) as
+<r:code>
+bindings$getrusage = 
+    createMethodBinding(rr$getrusage, nodes = g, 
+                        paramStyle = c("", "out"))
+</r:code>
+Alternatively, after we have resolved the routines, we
+can specify the vector for the
+<r:field>paramStyle</r:field> field of the getrusage
+element, i.e.
+<r:code>
+rr$getrusage$paramStyle = c("", "out")
+</r:code>
+And then this will be used during any call to 
+<r:func>createMethodBinding</r:func>
+for the getrusage resolved routine
+that does not explicitly pass a value for the 
+<r:arg>paramStyle</r:arg> argument.
+<note><para>The paramStyle should allow for named entries and then
+get expanded to have an entry for each parameter, e.g. 
+c("__usage" = "out") and then have this turn into c("", "out"),
+with or without names.
+</para></note>
+</para>
+
+</section>
+
+<issues>
+The timeval or timevalPtr string in the second argument of getNativeReference in 
+<c:code>
+R_coerce_timevalPtr_timeval ( SEXP from )
+{
+	struct  timeval * ans ;
+	ans = (struct  timeval *) R_getNativeReference(from, "timeval", "timevalPtr");
+	return( R_copyStruct_timeval ( ans ) );
+} 
+</c:code>
+
+We should use the typdef for __suseconds_t, i.e. suseconds_t.
+Same for __time_t
+</issues>
+
+</article>

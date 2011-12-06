@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="/Users/duncan/Projects/org/omegahat/Docs/XSL/Rstyle.xsl"?>
+<article xmlns:s="http://cm.bell-labs.com/stat/S">
+<title>
+Parsing the TU files from R
+</title>
+<para>
+We have two mechanisms for parsing the TU files from within R.  The
+first and original uses RSPerl and makes use of the Perl module
+GCC::TranslationUnit by Ashley Winters.  This uses Perl to process the
+TU text file using regular expressions.  It was based on the output
+from an older gcc, version 3.2.2.  Because we had to update the
+parsing mechanism for newer versions of gcc and in order to avoid the
+dependency on RSPerl, we implemented a parser using C++.  Speed is an
+issue as the TU files can be quite large and there can be many of them
+for a reasonably sized C/C++ project that is to be integrated into R.
+We model the C++ implementation after the Perl implementation, using
+regular expressions and a similar class hierarchy for representing
+individual nodes.  We use the PCRE library for the regular expressions
+via the C++ API.
+</para>
+<para>
+
+The R interface for parsing and accessing the contents of the nodes is
+essentially the same as that for the Perl approach. One calls the
+function <s:func>parseTU</s:func> to read a .tu or .t00.tu file.  One
+can access the nodes using integer indices.
+</para>
+<para>
+One creates
+</para>
+
+</article>

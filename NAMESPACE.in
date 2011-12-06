@@ -1,0 +1,481 @@
+import(RAutoGenRunTime)
+importFrom(Combinations, combinations)
+
+# import(methods)
+
+
+if(@USE_NATIVE_TU_PARSER@) 
+  useDynLib(RGCCTranslationUnit)
+
+if(!@USE_NATIVE_TU_PARSER@)  {
+  S3method(parseTU, 'Perl')
+  S3method(getDataStructures, 'GCC::TranslationUnit::Parser')
+  S3method(getNextNode, 'PerlReference')
+}
+
+export(getGlobalVariables, getGlobalInfo,
+        getEnumerations)
+
+export(getVariables)
+exportMethods(getVariables)
+
+#??? Which of these should we use.
+export(getDefines, getCppDefines, processDefines)
+
+export(parseTU)
+
+exportClasses(
+	'GCC::Node::abs_expr',
+	'GCC::Node::addr_expr',
+	'GCC::Node::array_ref',
+	'GCC::Node::bit_and_expr',
+	'GCC::Node::bit_ior_expr',
+	'GCC::Node::break_stmt',
+	'GCC::Node::call_expr',
+	'GCC::Node::case_label',
+	'GCC::Node::ceil_div_expr',
+	'GCC::Node::ceil_mod_expr',
+	'GCC::Node::complex_type',
+	'GCC::Node::enumeral_type',
+	'GCC::Node::component_ref',
+	'GCC::Node::compound_expr',
+	'GCC::Node::compound_stmt',
+	'GCC::Node::cond_expr',
+	'GCC::Node::const_decl',
+	'GCC::Node::constructor',
+	'GCC::Node::convert_expr',
+	'GCC::Node::decl_stmt',
+	'GCC::Node::do_stmt',
+	'GCC::Node::eq_expr',
+	'GCC::Node::expr_stmt',
+	'GCC::Node::field_decl',
+	'GCC::Node::fix_trunc_expr',
+	'GCC::Node::float_expr',
+	'GCC::Node::floor_div_expr',
+	'GCC::Node::floor_mod_expr',
+	'GCC::Node::for_stmt',
+	'GCC::Node::function_decl',
+	'GCC::Node::ge_expr',
+	'GCC::Node::goto_stmt',
+	'GCC::Node::gt_expr',
+	'GCC::Node::if_stmt',
+	'GCC::Node::indirect_ref',
+	'GCC::Node::init_expr',
+	'GCC::Node::integer_cst',
+	'GCC::Node::label_stmt',
+	'GCC::Node::le_expr',
+	'GCC::Node::lshift_expr',
+	'GCC::Node::lt_expr',
+	'GCC::Node::minus_expr',
+	'GCC::Node::modify_expr',
+	'GCC::Node::mult_expr',
+	'GCC::Node::namespace_decl',
+	'GCC::Node::ne_expr',
+	'GCC::Node::negate_expr',
+	'GCC::Node::non_lvalue_expr',
+	'GCC::Node::nop_expr',
+	'GCC::Node::parm_decl',
+	'GCC::Node::plus_expr',
+	'GCC::Node::postdecrement_expr',
+	'GCC::Node::postincrement_expr',
+	'GCC::Node::predecrement_expr',
+	'GCC::Node::preincrement_expr',
+	'GCC::Node::rdiv_expr',
+	'GCC::Node::result_decl',
+	'GCC::Node::return_stmt',
+	'GCC::Node::round_div_expr',
+	'GCC::Node::round_mod_expr',
+	'GCC::Node::rshift_expr',
+	'GCC::Node::save_expr',
+	'GCC::Node::scope_stmt',
+	'GCC::Node::string_cst',
+	'GCC::Node::switch_stmt',
+	'GCC::Node::target_expr',
+	'GCC::Node::template_decl',
+	'GCC::Node::tree_list',
+	'GCC::Node::trunc_div_expr',
+	'GCC::Node::trunc_mod_expr',
+	'GCC::Node::truth_andif_expr',
+	'GCC::Node::truth_orif_expr',
+	'GCC::Node::type_decl',
+	'GCC::Node::var_decl',
+	'GCC::Node::while_stmt',
+	'GCC::Node::abs_expr',
+	'GCC::Node::addr_expr',
+	'GCC::Node::aggr_init_expr',
+	'GCC::Node::array_ref',
+	'GCC::Node::array_type',
+	'GCC::Node::arrow_expr',
+	'GCC::Node::asm_expr',
+	'GCC::Node::baselink',
+	'GCC::Node::bind_expr',
+	'GCC::Node::binfo',
+	'GCC::Node::bit_and_expr',
+	'GCC::Node::bit_ior_expr',
+	'GCC::Node::bit_not_expr',
+	'GCC::Node::bit_xor_expr',
+	'GCC::Node::boolean_type',
+	'GCC::Node::break_stmt',
+	'GCC::Node::call_expr',
+	'GCC::Node::case_label_expr',
+	'GCC::Node::cast_expr',
+	'GCC::Node::complex_type',
+	'GCC::Node::component_ref',
+	'GCC::Node::compound_expr',
+	'GCC::Node::cond_expr',
+	'GCC::Node::const_cast_expr',
+	'GCC::Node::const_decl',
+	'GCC::Node::constructor',
+	'GCC::Node::continue_stmt',
+	'GCC::Node::convert_expr',
+	'GCC::Node::ctor_initializer',
+	'GCC::Node::decl_expr',
+	'GCC::Node::dl_expr',
+	'GCC::Node::do_stmt',
+	'GCC::Node::dotstar_expr',
+	'GCC::Node::enumeral_type',
+	'GCC::Node::eq_expr',
+	'GCC::Node::exact_div_expr',
+	'GCC::Node::expr_stmt',
+	'GCC::Node::field_decl',
+	'GCC::Node::fix_trunc_expr',
+	'GCC::Node::float_expr',
+	'GCC::Node::for_stmt',
+	'GCC::Node::function_type',
+	'GCC::Node::ge_expr',
+	'GCC::Node::goto_expr',
+	'GCC::Node::gt_expr',
+	'GCC::Node::handler',
+	'GCC::Node::identifier_node',
+	'GCC::Node::if_stmt',
+	'GCC::Node::indirect_ref',
+	'GCC::Node::integer_cst',
+	'GCC::Node::integer_type',
+	'GCC::Node::label_decl',
+	'GCC::Node::label_expr',
+	'GCC::Node::lang_type',
+	'GCC::Node::le_expr',
+	'GCC::Node::lshift_expr',
+	'GCC::Node::lt_expr',
+	'GCC::Node::member_ref',
+	'GCC::Node::method_type',
+	'GCC::Node::minus_expr',
+	'GCC::Node::modify_expr',
+	'GCC::Node::modop_expr',
+	'GCC::Node::mult_expr',
+	'GCC::Node::namespace_decl',
+	'GCC::Node::ne_expr',
+	'GCC::Node::negate_expr',
+	'GCC::Node::nop_expr',
+	'GCC::Node::nw_expr',
+	'GCC::Node::obj_type_ref',
+	'GCC::Node::overload',
+	'GCC::Node::parm_decl',
+	'GCC::Node::plus_expr',
+	'GCC::Node::pointer_type',
+	'GCC::Node::postdecrement_expr',
+	'GCC::Node::postincrement_expr',
+	'GCC::Node::predecrement_expr',
+	'GCC::Node::preincrement_expr',
+	'GCC::Node::rdiv_expr',
+	'GCC::Node::real_cst',
+	'GCC::Node::real_type',
+	'GCC::Node::record_type',
+	'GCC::Node::reference_type',
+	'GCC::Node::reinterpret_cast_expr',
+	'GCC::Node::result_decl',
+	'GCC::Node::return_expr',
+	'GCC::Node::rshift_expr',
+	'GCC::Node::save_expr',
+	'GCC::Node::scope_ref',
+	'GCC::Node::sizeof_expr',
+	'GCC::Node::statement_list',
+	'GCC::Node::static_cast_expr',
+	'GCC::Node::string_cst',
+	'GCC::Node::switch_stmt',
+	'GCC::Node::tag_defn',
+	'GCC::Node::template_decl',
+	'GCC::Node::template_id_expr',
+	'GCC::Node::template_parm_index',
+	'GCC::Node::template_type_parm',
+	'GCC::Node::throw_expr',
+	'GCC::Node::tree_list',
+	'GCC::Node::tree_vec',
+	'GCC::Node::trunc_div_expr',
+	'GCC::Node::trunc_mod_expr',
+	'GCC::Node::truth_andif_expr',
+	'GCC::Node::truth_not_expr',
+	'GCC::Node::truth_orif_expr',
+	'GCC::Node::try_block',
+	'GCC::Node::try_catch_expr',
+	'GCC::Node::try_finally',
+	'GCC::Node::type_decl',
+	'GCC::Node::typename_type',
+	'GCC::Node::union_type',
+	'GCC::Node::using_decl',
+	'GCC::Node::var_decl',
+	'GCC::Node::vector_type',
+	'GCC::Node::void_type',
+	'GCC::Node::while_stmt',
+	'GCC::Node::function_decl'
+#	'GCC::TranslationUnit::Parser'
+        )
+
+
+  
+if(FALSE) {
+ export(generateGlobalVariableCode)
+ export(generateClassBindings)
+}
+
+# exportPattern(".*")
+
+
+########################################
+
+
+exportClasses( 'CRoutineDefinition',
+	'C++RoutineDefinition',
+	'CodeDefinition',
+	'NativeRoutineDefinition',
+	'RFunctionDefinition',
+	'DerivedClassCode',
+
+	'RC++Reference',
+	'TypeDefinition',
+	'PointerType',
+	'ArrayType',
+	'TypedefDefinition',
+	'ContainerDefinition',
+	'StructDefinition',
+	'C++ClassDefinition',
+	'UnionDefinition',
+	'EnumerationDefinition',
+	'TypedefEnumerationDefinition',
+	'RoutineDefinition',
+	'PendingType',
+	'C++ReferenceType',
+	'BuiltinPrimitiveType',
+	'boolType',
+	'intType',
+	'doubleType',
+	'longType',
+	'voidType',
+        'SEXP' )
+
+
+
+S3method(resolveType, 'GCC::Node::boolean_type')
+S3method(resolveType, 'GCC::Node::enumeral_type')
+S3method(resolveType, 'GCC::Node::function_decl')
+S3method(resolveType, 'GCC::Node::integer_type')
+S3method(resolveType, 'GCC::Node::pointer_type')
+S3method(resolveType, 'GCC::Node::record_type')
+S3method(resolveType, 'GCC::Node::parm_decl')
+S3method(resolveType, 'GCC::Node::type_decl')
+S3method(resolveType, 'GCC::Node::real_type')
+S3method(resolveType, 'GCC::Node::template_type_parm')
+S3method(resolveType, 'GCC::Node::typename_type')
+S3method(resolveType, 'NativeOperatorClassMethod')
+S3method(resolveType, 'ContainerDefinition')
+S3method(resolveType, 'integer')
+S3method(resolveType, 'list')
+S3method(resolveType, 'character')
+S3method(resolveType, 'EnumerationNodeList')
+S3method(resolveType, 'GCC::Node::array_type')
+S3method(resolveType, 'GCC::Node::complex_type')
+S3method(resolveType, 'GCC::Node::field_decl')
+S3method(resolveType, 'GCC::Node::function_type')
+S3method(resolveType, 'GCC::Node::reference_type')
+S3method(resolveType, 'GCC::Node::union_type')
+S3method(resolveType, 'GCC::Node::var_decl')
+S3method(resolveType, 'GCC::Node::void_type')
+S3method(resolveType, 'NativeClassMethod')
+S3method(resolveType, 'NativeRoutine')
+S3method(resolveType, 'NativeRoutineDescription')
+S3method(resolveType, 'numeric')
+S3method(resolveType, 'RoutineNodeList')
+S3method(resolveType, 'TUParserIndex')
+S3method(resolveType, 'UnresolvedClassMethods')
+S3method(resolveType, 'default')
+S3method(resolveType, 'FunctionPointer')
+
+
+S3method(`[[`, 'BaseClassesInfo')
+S3method(getExportNames, 'C++ClassInterfaceBindings')
+S3method(getNodeID, 'default')
+S3method(getNodeID, 'NativeClassMethod')
+S3method(getNodeID, 'NativeRoutineDescription')
+S3method(getNodeID, 'PendingType')
+S3method(getParameters, 'GCC::Node::function_decl')
+S3method(getParameters, 'GCC::Node::function_type')
+S3method(getParameters, 'GCC::Node::method_type')
+S3method(getParameters, 'GCC::Node::parm_decl')
+S3method(getParameters, 'GCC::Node::tree_list')
+S3method(getValue, 'GCC::Node::addr_expr')
+S3method(getValue, 'GCC::Node::negate_expr')
+S3method(getValue, 'GCC::Node::aggr_init_expr')
+S3method(getValue, 'GCC::Node::bit_and_expr')
+S3method(getValue, 'GCC::Node::bit_ior_expr')
+S3method(getValue, 'GCC::Node::bit_xor_expr')
+S3method(getValue, 'GCC::Node::call_expr')
+S3method(getValue, 'GCC::Node::const_decl')
+S3method(getValue, 'GCC::Node::function_decl')
+S3method(getValue, 'GCC::Node::indirect_ref')
+S3method(getValue, 'GCC::Node::integer_cst')
+S3method(getValue, 'GCC::Node::nop_expr')
+S3method(getValue, 'GCC::Node::real_cst')
+S3method(getValue, 'GCC::Node::string_cst')
+S3method(getValue, 'GCC::Node::target_expr')
+S3method(getValue, 'GCC::Node::var_decl')
+S3method(getValue, 'GCC::Node::cast_expr')
+S3method(getValue, 'GCC::Node::component_ref')
+S3method(getValue, 'GCC::Node::constructor')
+S3method(getValue, 'GCC::Node::identifier_node')
+S3method(getValue, 'GCC::Node::if_stmt')
+S3method(getValue, 'GCC::Node::lt_expr')
+S3method(getValue, 'GCC::Node::scope_ref')
+S3method(getValue, 'GCC::Node::template_type_parm')
+S3method(getValue, 'GCC::Node::tree_list')
+S3method(getValue, 'GCC::Node::truth_andif_expr')
+S3method(getValue, 'GCC::Node::truth_not_expr')
+S3method(is, 'CallCompatible')
+S3method(is, 'CCompatible')
+S3method(is, 'CParameterType')
+S3method(names, 'BaseClassesInfo')
+S3method(print, 'DefineConstants')
+S3method(print, 'ResolvedNativeClassMethod')
+S3method(print, 'StructDefinition')
+S3method(print, 'TypedefDefinition')
+
+if(FALSE) {           
+S3method(toRInitializer, 'character')
+S3method(toRInitializer, 'default')
+S3method(toRInitializer, 'InitializerValue')
+S3method(toRInitializer, 'VariableDefaultValue')
+}
+export(toRInitializer)           
+exportMethods(toRInitializer)
+
+export( 'coerce' )
+export( 'sapply' )
+export( 'lapply' )
+#export( 'names' )
+export( 'freeVariables' )
+export( '[[' )
+export( 'asReference' )
+export( '$' )
+export( 'coerceRValue' )
+export( 'convertRValue' )
+export( 'convertValueToR' )
+export( 'createDerivedClass' )
+export( 'getCallGraph' )
+export( 'getInOutArgs' )
+export( 'getNativeDeclaration' )
+export( 'writeCode' )          
+
+exportMethods( 'coerce' )
+exportMethods( 'sapply' )
+exportMethods( 'lapply' )
+exportMethods( 'names' )
+exportMethods( 'freeVariables' )
+exportMethods( '[[' )
+exportMethods( 'asReference' )
+exportMethods( '$' )
+exportMethods( 'coerceRValue' )
+exportMethods( 'convertRValue' )
+exportMethods( 'convertValueToR' )
+exportMethods( 'createDerivedClass' )
+exportMethods( 'getCallGraph' )
+exportMethods( 'getInOutArgs' )
+exportMethods( 'getNativeDeclaration' )
+exportMethods( 'writeCode' )
+          
+
+
+#  export(getInfoNodeType)
+
+
+# manual
+
+#export(parseTUInfo)
+
+export(getRoutines)
+export(resolveType)
+
+
+export(parseTU)
+
+export(getParameters, getDataStructures)
+exportMethods(getDataStructures)
+
+export(getNodeID, getValue, getNodeSource) #  getName) # getNextNode, getNextNodeByType)
+
+
+export(is.CallCompatible, is.CParameterType) # "is_.C_routine"                            
+
+S3method(print, DefineConstants)
+S3method(print, ResolvedNativeClassMethod)
+S3method(print, ResolvedNativeRoutine)
+S3method(print, StructDefinition)
+S3method(print, TypedefDefinition)
+
+export(DefinitionContainer)
+
+export(writeCode, writeDocumentation, 
+       writeEnumGenerationRCode, writeIncludes)
+
+
+#S3method(getDataStructures, DefinitionContainer)
+#S3method(getDataStructures, TUParser)
+
+exportMethods(sapply)
+exportMethods(lapply)
+
+
+
+
+# export(getRTypeName)
+
+#
+export(RCode, RClassDef, RDollarDefinition, RAsDefinition)
+
+export(CRoutineDefinition, 'C++MethodDefinition')
+
+export(BuiltinTypeTable)
+
+
+export(getClassHierarchyMatrix)
+
+export(findTUFile)
+
+export(generateInterface, generateClassBindings) # generateTUWrapper,
+export(generateStructInterface)
+# createInterface
+
+export(computeGlobalConstants, computeGlobalEnumConstants)
+
+export(getClassNodes)
+export(getClassMethods)
+
+export(getBaseClasses)
+
+
+export(createProxyRCall)
+
+
+
+export(getRegistrationInfo, gatherRegistrationInfo, generateRegistrationCode)
+
+
+export("getNodeByType")
+exportMethods("getNodeByType")
+
+# exportPattern(".*")
+
+export(getRTypeName)
+exportMethods(getRTypeName)
+
+exportMethods(show)
+
+exportClasses("NodeIndex", "RAnonymousFunctionOrCode")

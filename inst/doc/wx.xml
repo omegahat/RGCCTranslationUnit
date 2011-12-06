@@ -1,0 +1,13 @@
+
+<sh:code>
+g++ -fdump-translation-unit -o /dev/null -c `wx-config --cflags` ~/Projects/org/omegahat/R/RwxWidgets/autoGenerate/wx.cpp -DNO_WX_VARS=1
+</sh:code>
+
+<r:code>
+wx = parseTU("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/examples/wx.cpp.001t.tu")
+</r:code>
+
+<r:code>
+classes = getClassNodes(wx, basename(list.files("/usr/local/include/wx-2.8", recursive = TRUE)))
+</r:code>
+This gives 614.

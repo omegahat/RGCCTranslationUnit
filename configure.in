@@ -1,0 +1,137 @@
+AC_INIT(R/constants.R)
+
+# Don't actually the need the run-time to do the code analysis.
+dnl R_RUN_TIME=`echo "cat(.findPackage('RAutoGenRunTime'), '\n')" | R --vanilla `
+dnl if test -z "$R_RUN_TIME" ; then
+dnl  echo "You need the R run time library"
+dnl fi
+
+AC_ARG_ENABLE(perl-tu, [--enable-perl-tu   if no, skips the installation of the translation unit module], INSTALL_TU=$withval , INSTALL_TU="no")
+
+AC_ARG_ENABLE(native-parser, [--enable-native-parser   if no, skips the installation of the C++-based TU parser], [INSTALL_NATIVE_TU=$enableval; INSTALL_TU="no"] , INSTALL_NATIVE_TU="yes")
+
+if test "$INSTALL_NATIVE_TU" = "yes" ; then
+  INSTALL_TU="no"
+fi
+
+echo "Install native parser:  $INSTALL_NATIVE_TU"
+echo "Install perl parser:  $INSTALL_TU"
+
+USE_PERL_TU_PARSER="FALSE"
+
+if test "$INSTALL_TU" = "yes" ; then
+
+ if ! test -d $R_PACKAGE_DIR ; then
+   mkdir $R_PACKAGE_DIR
+ fi
+
+ if ! test -d $R_PACKAGE_DIR/share ; then
+   mkdir $R_PACKAGE_DIR/share
+ fi
+
+ if ! test -d $R_PACKAGE_DIR/share/perl ; then
+   mkdir $R_PACKAGE_DIR/share/perl
+ fi
+
+ CUR_DIR=`pwd`
+
+ cd inst/GCC-TranslationUnit-1.00
+   dnl Need to find perl
+ perl Makefile.PL PREFIX=$R_PACKAGE_DIR/share/perl
+ make install
+ make clean
+
+ cd ${CUR_DIR}
+ echo "`pwd`"
+
+dnl Don't actually use this. Compute it in R itself.
+ PERL5LIB="$R_PACKAGE_DIR/share/perl/lib/perl5/site_perl"
+ AC_SUBST(PERL5LIB)
+
+ if test $? = 0 ; then
+   echo "Installed GCC-TranslationUnit-1.00 in $R_PACKAGE_DIR/share/perl"
+   USE_PERL_TU_PARSER="TRUE"
+ else
+   echo "Seemed to fail on installing GCC-TranslationUnit-1.00"
+   echo "There are a multitude of possible reasons for this"
+   echo "One thing that might be possible wrong is that you don't have permissions"
+   echo "on all the directories under inst/GCC-TranslationUnit-1.00 in this directory."
+   echo "It would be strange, but it has happened to me when I have previously installed this"
+   echo "into the regular Perl directories as root"
+   exit 1
+ fi
+
+fi # end of INSTALL_TU = "yes"
+
+if test "$INSTALL_NATIVE_TU" = "yes" ; then
+
+echo "Looking for libpcrecpp for regular expression support"
+
+if test -z "$USE_R_PCRE" ; then
+
+ AC_PATH_PROG(PKG_CONFIG, pkg-config)
+
+ if test -n "$PKG_CONFIG" ; then
+   PCRE_CFLAGS=`$PKG_CONFIG --cflags libpcrecpp`
+   PCRE_LIBS=`$PKG_CONFIG --libs libpcrecpp`
+   if test $? = 0 ; then
+      echo "Found libpcrecpp flags ($PCRE_CFLAGS) from $PKG_CONFIG"
+      CFLAGS="$CFLAGS $PCRE_CFLAGS"
+   fi
+ fi
+
+ if test -z "${PCRE_LIBS}" ; then
+     echo "Not using pkg-config, so guessing where libpcre files are located."
+     PCRE_CFLAGS="-I/usr/local/include"
+     PCRE_LIBS="-L/usr/local/lib -lpcrecpp"
+ fi
+
+
+ AC_LANG_PUSH(C++)
+ AC_TRY_COMPILE(
+         [#include <pcrecpp.h>],,
+         [echo "found pcrecpp.h header file"],
+         [echo "Cannot seem to find pcrecpp.h." ; exit 1])
+
+
+ echo "Libs: $PCRE_LIBS"
+
+ LIBS="$LIBS $PCRE_LIBS"
+ AC_TRY_LINK(
+         [#include <pcrecpp.h>],
+         [
+           pcrecpp::RE tokenRegExpr("^(foo|bar).*x$");
+         ],
+         [echo "can link with libpcrecpp"],
+         [echo "Cannot seem to link against libpcrecpp"; exit 2])
+
+  USE_NATIVE_TU_PARSER="TRUE"
+else
+
+   echo "Using R's own pcre routines"
+   PCRE_CFLAGS=""
+   PCRE_LIBS=""
+   USE_NATIVE_TU_PARSER="TRUE"
+
+ fi
+else
+  DEFINES="$DEFINES -DR_NO_NATIVE_TU_PARSER=1"
+  USE_NATIVE_TU_PARSER="FALSE"
+fi
+
+
+AC_SUBST(PCRE_CFLAGS)
+AC_SUBST(PCRE_LIBS)
+
+AC_SUBST(DEFINES)
+
+
+AC_SUBST(USE_NATIVE_TU_PARSER)
+AC_SUBST(USE_PERL_TU_PARSER)
+
+echo "`pwd`"
+echo "Native parser: $USE_NATIVE_TU_PARSER"
+
+AC_OUTPUT(src/Makevars R/ConfigVars.R NAMESPACE)
+
+

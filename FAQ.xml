@@ -1,0 +1,75 @@
+<qandaset>
+
+<question>
+How do I install this package?
+<answer>
+The usual command-line command 
+<code>R CMD INSTALL RGCCTranslationUnit</code>
+or <r:code>install.packages("RGCCTranslationUnit")</r:code> in R.
+</answer>
+</question>
+<question>
+Yeah, I know how to install an R package, but the configuration complains about
+not finding some "libpcrecpp". What am I supposed to do?
+<answer>
+<para>
+The package does indeed want the C++ bindings/interface to the Perl Compatible Regular Expression library, libpcre
+and so we need libpcrecpp. This comes with the libpcre source code and can be installed by 
+installing that, e.g. from source. When using package managers such as apt-get and yum, you
+should install libpcrecpp-dev, or something like that to get the library and the header files.
+</para>
+<para>
+When you install libpcrecpp, you  may also want ensure that pkg-config
+can find the libpcrecpp.pc file. This is used to figure out the
+compiler and linker flags during the configuration.
+Make certain that the environment variable
+PKG_CONFIG_PATH contains the directory in which the newly installed
+libpcrecpp.pc file is located.
+</para>
+<para>
+If the libpcrecpp header files and library are installed in /usr/local/include/ and
+/usr/local/lib/ respectively, the configuration script will find them.
+</para>
+</answer>
+</question>
+<question>
+I want to control the output of the includes but RConverters.h
+is always added. How can I stop this?
+<answer>
+Specify your includes with <r:code>I(c("a.h", "b.h"))</r:code>
+to treat them literally.
+<r:func>writeIncludes</r:func> will then not add RConverters.h.
+</answer>
+</question>
+
+<question>
+I got an error when resolving some node
+and now every time I try to resolve that
+node again,  I get a PendingType back!
+How can I fix this?
+<answer>
+That does happen, but it is not supposed to as there are on.exit() calls
+that are intended to leave the container in a consistent state.
+But we'll fix that sometime.
+In the mean time,  get the index of the node
+from the PendingType, e.g. val@INDEX
+and give the command 
+<r:expr>remove(index, DefinitionContainer(tu)$.pending)</r:expr>
+If we cannot fix the root of the problem, we'llprovide a function
+to make the clean up easier.
+</answer>
+</question>
+
+<question>
+How do I customize the way a C type is converted
+to and from R, declared in R classes and C code?
+<answer>
+One way is to define a new subclass of TypeDefinition.  There are
+already many, so you probably want to select a more specific sub-class
+and then extend that.  There is an example of this in the package,
+namely the SEXP type. We define this as a subclass of
+TypedefDefinition and then we define methods for getRTypeName, etc.
+</answer>
+</question>
+
+</qandaset>

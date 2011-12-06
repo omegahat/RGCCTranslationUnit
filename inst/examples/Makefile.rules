@@ -1,0 +1,31 @@
+%.so: $(SRC)
+	R CMD SHLIB -o $@  $(SRC)
+
+define makeTU
+  $(CXX) $(CXX_FLAGS) -fdump-translation-unit -c -o /dev/null $<
+endef
+
+%.tu: %.cc
+	$(makeTU)
+
+%.tu: %.cpp
+	$(makeTU)
+
+%.tu: %.c
+	$(makeTU)
+
+%.xml: %.c
+	swig -xml -xmlout $@ -module foo $<
+
+%.xml: %.cc
+	swig -c++ -xml -xmlout $@ -module foo $<
+
+SWIG_FLAGS=-includeall
+
+%_wrap.xml: %.i
+	swig -c++ -xml -xmlout $@ $(SWIG_CPPFLAGS) $(SWIG_FLAGS) $<
+
+
+
+
+include $(DYN_DOCS)/inst/Make/Makefile

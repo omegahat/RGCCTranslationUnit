@@ -1,0 +1,1032 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="/Users/duncan/Projects/org/omegahat/Docs/XSL/Rstyle.xsl"?>
+<article
+         xmlns:c="http://www.C.org"
+         xmlns:s="http://cm.bell-labs.com/stat/S4"
+         xmlns:r="http://www.r-project.org"
+         xmlns:sh="http://www.shell.org"
+         xmlns:omegahat="http://www.omegahat.org"
+         xmlns:omg="http://www.omegahat.org"
+         xmlns:bioc="http://www.bioconductor.org"
+         xmlns:cpp="http://www.cplusplus.org"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         version="1.0"
+>
+
+<articleinfo>
+ <title>Dispatch for C++ Methods from R.</title>
+ <authorgroup>
+  <author>
+    <firstname>Duncan</firstname>
+    <surname>Temple Lang</surname>
+    <affiliation><ulink url="http://www.stat.ucdavis.edu/~duncan">Department of Statistics, UC Davis</ulink></affiliation>
+  </author>
+ </authorgroup>
+ <date/>
+</articleinfo>
+
+
+<section>
+<title>The Problem</title>
+<para>
+Suppose we have three classes A, B and C.  B extends A, while C is
+unrelated to both A and B.  We have methods foo and bar in all three
+classes.
+<cpp:code>
+<xi:include href="dispatch.h" parse="text"/>
+</cpp:code>
+foo(int) is a virtual and overridden in B.  We note that while A and B
+both have a method foo(double), A's method is not virtual and so
+cannot be overriden by A.  We also have a top-level routine named foo
+which is not associated with any class.
+</para>
+
+<para>
+How do we map these C++ methods into an R interface?  One approach is
+to use names that include the class name A_foo, B_foo, C_foo.  This
+avoids any extra run-time dispatch in the case of a call involving an
+instance of C.  For example,
+<r:code>
+c = new("C")
+C_foo(c, 1L)
+c$foo(1L)
+</r:code>
+now only explores the methods for the R function named "C_foo".
+We would have to differentiate between the two methods in C named
+foo, but only these two.
+Similarly, calls for instances of A or B do not need to include
+methods for foo for classes such as C in the search.
+Specifically, we will only look for the appropriate R methods
+within the set of methods for A_foo and B_foo.
+</para>
+
+<para>
+An alternative approach is to use the method name as a top-level name in R.
+And then we call this as
+<r:code>
+foo(c, 1L)
+</r:code>
+</para>
+
+<para>
+Let's define the classes in R that correspond to the C++-level classes.
+<r:code>
+library(RwxWidgets) # for C++ExternalPtr.  Will be in RAutoGenRunTime.
+
+setClass("A", contains = "C++ExternalPtr")
+setClass("B", contains = "A")
+setClass("C", contains = "C++ExternalPtr")
+</r:code>
+</para>
+
+<para>
+Let's consider the R interface to the C++ methods foo.  We'll start by
+focusing on the version that uses the method name, i.e. foo rather
+than the class name prefix, e.g. A_foo.
+</para>
+
+<para>
+When we get a call to foo for an instance of A or B, 
+what we would like to do is merge the methods for these two classes
+and then dispatch on this pooled collection.  To be
+concrete, we would have two S4 methods related to the class A for the
+function foo.
+<r:code>
+setGeneric("foo", function(this, x) standardGeneric("foo"))
+
+setMethod("foo", 
+          c("A", "integer") , 
+          function(this, x) 
+             .Call("R_A_foo_int", this, x))
+
+setMethod("foo", 
+          c("A", "numeric") , 
+          function(this, x) 
+             .Call("R_A_foo_double", this, x))
+</r:code>
+
+Now, for class B, we immediately have a problem.  There is a method
+with two arguments, so we need to redefine our version of foo in R to
+add this.  We would determine this ahead of time and define our
+generic to have the maximum number of parameters across all the
+methods.
+And we would define the signatures for our methods that took fewer
+arguments with the missing type for those "extra" arguments.
+<question>what about default values</question>
+</para>
+
+<para>
+Note that we have to take our top-level routine named foo into account
+here and look at its signature when determining the maximum number of
+parameters.  But in this case, it has only two parameters and the
+method for foo in B has 3 (including the this.)
+<r:code>
+setGeneric("foo", function(this, x, y) standardGeneric("foo"))
+
+  # A::foo(int)
+setMethod("foo", 
+          c("A", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_int", this, x))
+
+  # A::foo(double)
+setMethod("foo", 
+          c("A", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_double", this, x))
+</r:code>
+
+Note that we are quite explicit about adding the missing names here.
+We need to avoid the possibility that either of these would match
+agains a call with three arguments, i.e. an additional argument.
+</para>
+
+<para>
+Now, for class B.
+We define the methods for the four different
+foo methods.
+<r:code>
+  # B::foo(int, y)
+setMethod("foo", 
+          c("B", "numeric", "numeric") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int_double", this, x, y))
+
+  # B::foo(int)
+setMethod("foo", 
+          c("B", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int", this, x))
+
+  # B::foo(double)
+setMethod("foo", 
+          c("B", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_double", this, x))
+
+   # B::foo(const char *)
+setMethod("foo", 
+          c("B", "character") , 
+          function(this, x, y) 
+             .Call("R_B_foo_charp", this, x))
+</r:code>
+</para>
+
+<para>
+And the definitions for C's two foo methods are
+<r:code>
+  # C::foo(int)
+setMethod("foo", 
+          c("C", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_C_foo_int", this, x))
+
+  # C::foo(double)
+setMethod("foo", 
+          c("C", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_C_foo_double", this, x))
+</r:code>
+</para>
+
+<para>
+And now we can test this by creating instances of these classes and
+invoking methods.  For convenience, we will avoid calling the actual C
+routine at the moment.  Instead, we will just return the name of the C
+routine that would be called. We do this by changing the definition of
+<r:func>.Call</r:func>.
+<r:code>
+.Call = function(name, ...) { print(list(...)) ;  name }
+</r:code>
+</para>
+
+<para>
+We create instances of each class.
+<r:code>
+a = new("A")
+b = new("B")
+c = new("C")
+</r:code>
+
+We call the methods for A
+<r:code>
+foo(a, 1)  # double
+foo(a, 1L) # int
+</r:code>
+
+<r:code>
+foo(b, 1)
+foo(b, 1L)
+foo(b, 1, 1)
+foo(b, "1")
+</r:code>
+
+For C
+<r:code>
+foo(c, 1)
+foo(c, 1L)
+</r:code>
+
+We test that calls to non-existant 
+methods do not find any methods.
+<r:code>
+
+foo(a) # no method
+foo(1, 2)
+foo(c, "1")
+</r:code>
+</para>
+
+<para>
+Since A::foo(double) is not virtual, how
+can we call that instance with an instance
+of B?
+<r:code>
+a = .Call("R_A_new")
+b = .Call("R_B_new")
+if(length(find(".Call")) > 1) rm(.Call)
+foo(a, 1.4)
+foo(b, 1.4)
+foo(as(b, "A"), 1.4)
+</r:code>
+However, if we do this for the A:bar(int) which is virtual, we will
+invoke the R-C++ interface routine R_A_bar_int, but will 
+end up calling the B::bar(int) method as C++ will use the virtual
+method.
+We can test this with the actual C++ code
+<r:code>
+bar(a, 1L)
+bar(b, 1L)
+bar(as(b, "B"), 1L)
+</r:code>
+(Alternatively, a
+</para>
+
+
+
+<section>
+<title>Using the Class_methodName approach</title>
+<para>
+Now we turn our attention to how we might use the Class_methodName
+approach such as A_foo, B_foo and C_foo.  For C, the setup is the same
+as above with a different name for the generic which we also have to
+define.  However, we can simplify the definition of the signature of
+the generic and of the methods as we know there are only 2 arguments
+here.
+<r:code>
+setGeneric("C_foo", function(this, x) standardGeneric("C_foo"))
+
+  # C::foo(int)
+setMethod("C_foo", 
+          c("C", "integer") , 
+          function(this, x) 
+             .Call("R_C_foo_int", this, x))
+
+  # C::foo(double)
+setMethod("C_foo", 
+          c("C", "numeric") , 
+          function(this, x) 
+             .Call("R_C_foo_double", this, x))
+</r:code>
+
+Now, we could do the same thing for A. However, because foo is
+polymorphic across the classes A and B, we will need to be able to
+find the correct method across both classes.  Specifically, we need
+the methods to have the same basic definition, i.e. number and names
+of arguments. So the code will actually be very similar to what we
+have above.
+<r:code>
+setGeneric("A_foo", function(this, x, y) standardGeneric("A_foo"))
+
+  # A::foo(int)
+setMethod("A_foo", 
+          c("A", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_int", this, x))
+
+  # A::foo(double)
+setMethod("A_foo", 
+          c("A", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_double", this, x))
+</r:code>
+
+And for B, 
+<r:code>
+setGeneric("B_foo", function(this, x, y) standardGeneric("B_foo"))
+
+  # B::foo(int, y)
+setMethod("B_foo", 
+          c("B", "numeric", "numeric") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int_double", this, x, y))
+
+  # B::foo(int)
+setMethod("B_foo", 
+          c("B", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int", this, x))
+
+  # B::foo(double)
+setMethod("B_foo", 
+          c("B", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_double", this, x))
+
+   # B::foo(const char *)
+setMethod("B_foo", 
+          c("B", "character") , 
+          function(this, x, y) 
+             .Call("R_B_foo_charp", this, x))
+</r:code>
+</para>
+
+<para>
+Another approach is that every time we find a polymorphic method, we
+use the name of the original class that declared it virtual.  That is
+instead of B_foo, we would create methods for A_foo.
+This is simple and sensible and looks like the best approach.
+
+<r:code>
+setGeneric("A_foo", function(this, x, y) standardGeneric("A_foo"))
+
+  # A::foo(int)
+setMethod("A_foo", 
+          c("A", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_int", this, x))
+
+  # A::foo(double)
+setMethod("A_foo", 
+          c("A", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_A_foo_double", this, x))
+
+  # B::foo(int, y)
+setMethod("A_foo", 
+          c("B", "numeric", "numeric") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int_double", this, x, y))
+
+  # B::foo(int)
+setMethod("A_foo", 
+          c("B", "integer", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_int", this, x))
+
+  # B::foo(double)
+setMethod("A_foo", 
+          c("B", "numeric", "missing") , 
+          function(this, x, y) 
+             .Call("R_B_foo_double", this, x))
+
+   # B::foo(const char *)
+setMethod("A_foo", 
+          c("B", "character") , 
+          function(this, x, y) 
+             .Call("R_B_foo_charp", this, x))
+</r:code>
+<r:code>
+a$foo(1L)              # "R_A_foo_int"
+b$foo(1L)              # "R_B_foo_int"
+b$foo(1L, 2)           # "R_B_foo_int_double"
+as(b, "A")$foo(1L)     # "R_A_foo_int"
+</r:code>
+</para>
+</section>
+
+
+<para>
+The names of the parameters are important in R as we allow arguments
+to be specified by name.  They are not important in C++.  When we have
+to force the methods in R to have the same parameter names as each
+other and the generic function, then the (generated) code becomes
+somewhat more complex to understand.  Let's take a look at the methods
+for bar.
+To define the generic in R, we would find all the methods and
+compute the maximum number of parameters.
+This is in the definition in C with three parameters: f, g, h.
+So, we can define our generic as 
+<r:code>
+setGeneric("bar", function(this, f, g, h = 1) {
+                     standardGeneric("bar")
+                  })
+</r:code>
+Now, the method in R for class C is 
+<r:code>
+setMethod("bar", c("C", "numeric", "integer"),
+           function(this, f, g, h = 1) {
+               .Call("R_C_bar_double_int_int", this, f, g, as(h, "integer"))
+           })
+</r:code>
+
+We could be more liberal in the case of an integer
+and allow for a numeric value and then coerce it.
+<r:code>
+setMethod("bar", c("C", "numeric", "numeric"),
+          function(this, f, g, h = 1) {
+            .Call("R_C_bar_double_int_int", this, f, 
+                                            as(g, "integer"), as(h, "integer"))
+          })
+</r:code>
+We have left the last argument as an implicit ANY and try to coerce
+the value to an integer.  We could have explicitly put a "numeric"
+requirement for this argument but this leaves things open for people
+to define coercion methods for their classes to an integer.
+</para>
+
+<para>
+As this not a virtual method and because it is separate from 
+the other methods of this name, we can define the function
+as 
+<r:code>
+C_bar =
+function(this, f, g, h = 1)
+ .Call("R_C_bar_double_int_int", this, as(f, "numeric"), 
+                                 as(g, "integer"), as(h, "integer"))
+</r:code>
+Then we can call this as 
+<r:code>
+C_bar(c, 1, 2)
+c$bar(1, 2)
+</r:code>
+If we define this using the C_bar form, then when we look at the
+methods for A and B, we are dealing with a smaller subset
+and the complexity of names is somewhat reduced.
+However, we can also use both.
+</para>
+
+<para>
+For A, we have two parameters: u and v.  And for B, we have just 1. We
+would like to be able to allow the R users take advantage of the
+default values for the parameters.  So if somebody makes a call such
+as <r:expr>bar(a, 1L)</r:expr> then we would dispatch to
+R_A_bar_int_double with the value of v set to 0.  Alternatively, if
+they give us the complete version <r:expr>bar(a, 1L, 3.1415)</r:expr>
+we would again dispatch to this.  But for the case of, <r:expr>bar(a,
+1)</r:expr> we can also identify that this is for the same method and
+then coerce our numeric to an integer.  But when we have an instance
+of B, how are the methods identified?  and the default arguments.
+<r:expr>bar(b)</r:expr> should be equivalent to a call <r:expr>bar(b,
+1L)</r:expr>.
+
+<r:code>
+setMethod("bar", c("A", "integer", "missing", "missing"),
+           function(this, f, g, h = 1) {
+                print(c("int", f))
+               .Call("R_A_bar_int", this, f)
+           })
+# default argument of 1 for 'u'
+setMethod("bar", c("A", "missing", "missing", "missing"),
+           function(this, f, g, h = 1) {
+                print(c("int", 1L))
+               .Call("R_A_bar_int", this, 1L)
+           })
+
+
+# if we get a real valued number, then cast numeric to int.
+setMethod("bar", c("A", "numeric", "missing", "missing"),
+           function(this, f, g, h = 1) {
+                print(c("int", as(f, "integer")))
+               .Call("R_A_bar_int", this, as(f, "integer"))
+           })
+</r:code>
+
+For the second bar method that takes an int and a double, we have
+little "wiggle" room.  We can coerce a real value for the 'u' argument
+to an integer, but that is about the onl "help" we can provide.
+<r:code>
+setMethod("bar", c("A", "numeric", "numeric", "missing"),
+           function(this, f, g, h = 1) {
+                print(c("double, double", as(f, "integer"), g))
+               .Call("R_A_bar_double_int", this, f, g)
+           })
+
+setMethod("bar", c("A", "integer", "numeric", "missing"),
+           function(this, f, g, h = 1) {
+                print(c("integer, double", f, g))
+               .Call("R_A_bar_double_int", this, f, g)
+           })
+</r:code>
+
+Now, for B, we have <fix/>
+<r:code>
+setMethod("bar", c("B", "missing", "missing", "missing"),
+            function(this, f, g, h = 1) { 
+               print("default value of 1")
+               .Call("R_B_bar_int", this, 1L)
+            })
+#XXX
+setMethod("bar", c("B", "ANY", "missing", "missing"),
+            function(this, f, g, h = 1) { 
+                print(as(f, "integer"))
+               .Call("R_B_bar_int", this, as(f, "integer"))
+            })
+</r:code>
+
+
+<r:code>
+showMethods("bar")
+Function: bar (package .GlobalEnv)
+this="A", f="integer", g="missing", h="missing"
+this="A", f="integer", g="numeric", h="missing"
+this="A", f="missing", g="missing", h="missing"
+this="A", f="numeric", g="missing", h="missing"
+this="A", f="numeric", g="numeric", h="missing"
+this="B", f="ANY", g="missing", h="missing"
+this="B", f="missing", g="ANY", h="ANY"
+this="B", f="missing", g="missing", h="missing"
+this="C", f="numeric", g="integer", h="ANY"
+</r:code>
+
+Now let's test these
+
+We'll call B's bar only explicit method - bar(int).
+<r:code>
+ bar(b, 10L)
+ bar(b, 10)  # automatic coercion from numeric to integer
+</r:code>
+Similarly, because of the default argument, 
+<r:code>
+ bar(b)
+</r:code>
+invokes the method B::bar(int) with the value 1.
+
+Let's call the inherited methods from A on a B object
+<r:code>
+ bar(b, 1L, 2.3)
+</r:code>
+</para>
+
+
+<section>
+<title>Calling Inherited Methods Explicitly</title>
+<para>
+Given an instance of B, how can we explicitly call A's version of the
+bar(int) method?  Well, of course, we can call our wrapper routine
+R_A_bar_int_double.  But this will end up calling B's bar method as we
+will end up with a pointer to a B and the overriding, virtual method
+in class B will be used by C++. In C++ code, we would use
+<cpp:code>
+ B *ptr;
+ ptr->A::bar();
+</cpp:code>
+For  virtual methods in derived classes, we want our bindings to allow
+us to call the inherited method.
+So we can add a .inherited parameter in our R functions
+with a default value of <r:false/>.
+If this is specified as <r:true/>, however, we call the inherited method.
+</para>
+
+<para>
+Multiple inheritance is a problem.
+We can allow for a character value to be given and 
+select the relevant piece of code based on that.
+For example, if W extends both A and C, 
+and defines its own method for multi(int,double), e.g.
+<cpp:code>
+class W : public A, public C {
+  virtual void multi(int x, double y);
+};
+</cpp:code>
+W has its own bar method and inherits others from A and C.
+These have very different signatures so we will inherit them from
+within R.
+And suppose we want to call A's bar(int, double) method
+"on" an instance of W.
+Then, we would want C++ code
+<cpp:code>
+    W *w;
+    int i; 
+    double d;
+    w->A::multi(i, d);
+</cpp:code>
+Our C++ wrapper routine that provides the R interface to  
+W's bar method would then be written as
+<cpp:code><![CDATA[
+R_W_multi(SEXP r_This, SEXP r_x, SEXP r_y, SEXP r_inherited)
+{
+  W *This = (W *) R_get_ExternalPtr(This, "W");
+  int x = asInteger(r_x);
+  double y = asReal(r_y);
+
+  if(GET_LENGTH(r_inherited) == 0 
+       || TYPEOF(r_inherited) == LGLSXP && LOGICAL(r_inherited)[0] == FALSE) {
+               // default call to W's own or inherited multi method.
+       This->multi(x, y);  
+
+  } else if (TYPEOF(r_inherited) == LGLSXP && LOGICAL(r_inherited)[0] == TRUE) {
+               // .inherited = TRUE, so call A's multi method!
+       This->A::multi(x, y);  
+
+  } else if (TYPEOF(r_inherited) == STRSXP) {
+                // use the names to find out which one.
+       const char *className = CHAR(STRING_ELT(r_inherited, 0));
+       if(strcmp(className, "A") == 0)
+           This->A::multi(x, y);
+       else if(strcmp(className, "C") == 0)
+           This->C::multi(x, y);
+       else {
+            PROBLEM ".inherited specified, but class name does not match parent classes with method 'multi'"
+	    WARN;
+       }
+  }
+}
+]]></cpp:code>
+We want to allow for all ancestor classes.
+For example, if A extended a class Top which had a multi method,
+then we would want to be able to invoke its method also.
+So we would look at all the ancestor classes for such methods.
+</para>
+
+
+<para>
+To allow invocations of the form <r:expr>b$bar()</r:expr> and
+<r:expr>a$bar(1, 2)</r:expr>, we can specify specific methods for the
+$ operator in R for these classes.  We check the name being requested
+against the polymorphic methods and if it is one of those, then we
+return a function that calls that function by name, with the value of
+x as the first argument.  Alternatively, we use the regular $ method
+for our <r:class>C++ExternalPtr</r:class> class.
+<r:code>
+setMethod("$", "A", 
+          function(x, name) {
+             if(name %in% c("bar")) {
+                f = get(name, mode = "function")
+                function(...)
+                  f(x, ...)
+             } else
+                callNextMethod()
+          })
+</r:code>
+</para>
+
+<para>
+
+So, for C++ methods that are virtual (and so could be implemented in
+derived classes), we use S4 methods and define the function as
+methodName rather than Class_methodName, e.g. Add rather than
+wxSizer_Add.  For classes which have similarly named methods but which
+are not virtual, we use the regular Class_methodName,
+e.g. wxAcceleratorTable_Add.
+
+</para>
+
+</section>
+
+
+<section>
+<title>Summary of the Approach(es)</title>
+<para>
+So what are the rules we have discussed here?
+What is the algorithm we use to create the code?
+
+We look at the class and all its methods.  For a given method, we see
+if the method is overloaded within this class.  If it is, we define S4
+methods for the R interface to these C++ methods.  If it is not, then
+we just define the R function.  The name of the function, generic or
+method is either Class_methodName or simply methodName.  
+We can create both to provide three styles of interface:
+<r:code>
+method(obj, ...)
+Class_method(obj, ...)
+obj$method(...)
+</r:code>
+
+<itemizedlist>
+<listitem>
+When we are not dealing with overloaded or polymorphic methods, the R
+function is a straightforward mapping to the C++ method with the same
+number of arguments, etc. 
+</listitem>
+<listitem>When we are dealing with a polymorphic
+method, i.e. for which the same method is in multiple classes, then we
+need to use the general name, e.g. foo, Add, bar, and not (just) Class_method
+so that a call such as Add(x, ...)  will find S4 methods across all
+the different S4 classes. 
+</listitem>
+<listitem>
+ If the method is not polymorphic, but is
+overloaded, then we can define Class_method as a generic and use
+setMethod for giving the correct signatures that correspond to the
+C++ methods.
+</listitem>
+</itemizedlist>
+
+
+
+It is Class_methodName if there are no ancestor or descendant classes
+of this class which have a method of the same name
+
+</para>
+</section>
+</section>
+
+<section><title>Multiple Inheritance</title>
+<para>
+</para>
+</section>
+
+<section>
+<title>Generating the Bindings</title>
+We add a new class D which extends B and provides a method
+for the virtual method foo(int).
+This makes our exploration more 
+<sh:code>
+g++ -c -fdump-translation-unit dispatch.cc -o /dev/null
+</sh:code>
+
+Now we are ready to read this TU information into R
+and find the class definitions.
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU.Perl("dispatch.cc.t00.tu")
+classes = getClassNodes(tu, "dispatch.h")
+names(classes)
+</r:code>
+
+Now we fetch the methods and resolve them into
+full descriptions in R.
+<r:code>
+methods = lapply(classes, getClassMethods)
+types = DefinitionContainer()
+resolvedMethods = lapply(methods, resolveType, tu, types)
+</r:code>
+
+We can see the names of the methods with
+<r:code>
+lapply(resolvedMethods, names)
+</r:code>
+
+We can find all the top-level routines in either file with
+<r:code>
+r = getRoutines(tu, c("dispatch", "dispatch.h"))
+</r:code>
+This returns both foo and main
+<r:code>
+names(r)
+<r:output>
+[1] "main" "foo" 
+</r:output>
+</r:code>
+
+
+<para>
+We can find the class hierarchy using
+<r:code>
+inheritance = lapply(classes, getBaseClasses, recursive = TRUE)
+</r:code>
+Now, let's find all the overloaded methods within
+each class:
+<r:code>
+lapply(resolvedMethods, function(x) { tt = table(names(x)) ; names(tt) [ tt > 1] })
+<r:output>
+$A
+[1] "bar" "foo"
+
+$W
+character(0)
+
+$C
+[1] "foo"
+
+$B
+[1] "foo"
+
+$D
+character(0)
+</r:output>
+</r:code>
+So we see that bar and foo are overloaded within A
+and also in B and C.
+This means that we will define a generic and methods for A_bar and A_foo.
+Since C does not inherit from any of these classes, we will
+also define C_foo.  
+To determine if we will define B_foo, we need to see if 
+the foo methods in B are actually local methods
+of virtual methods defined in A.
+We know that this is the case for foo(int) in A and B.
+But we have to determine this.
+</para>
+
+<para>
+So let's find all the polymorphic methods.  Essentially, this means
+all the methods that are virtual:
+<r:code>
+lapply(resolvedMethods, function(x)  sapply(x, function(x) x$virtual))
+<r:output>
+$A
+  foo   foo   bar   bar multi 
+ TRUE FALSE  TRUE  TRUE  TRUE 
+
+$W
+multi 
+ TRUE 
+
+$C
+  foo   foo   bar multi 
+FALSE FALSE FALSE  TRUE 
+
+$B
+  foo   foo   foo   foo   bar 
+ TRUE  TRUE  TRUE FALSE  TRUE 
+
+$D
+ foo 
+TRUE 
+</r:output>
+</r:code>
+
+What we need to be able to do for each virtual method is to find the
+class in which it was defined. Then we will define the method for that
+class.  We use getInheritedMethod for this
+<r:code>
+getInheritedMethod(resolvedMethods[["B"]][[2]], resolvedMethods)
+</r:code>
+We pass it the method in which we are interested and the 
+list of resolved methods for all classes.
+If the return value is NULL, then there is no method higher up the
+class hierarchy corresponding to this one.
+</para>
+
+<para>
+So we see  that not all of B's foo methods are virtual
+and that only one of them is an inherited virtual method:
+<r:code>
+i = lapply(resolvedMethods$B[names(resolvedMethods$B) == "foo"], getInheritedMethod, resolvedMethods)
+</r:code>
+So we would define a generic for B_foo and set R methods for
+all of the C++ methods that are not an inherited virtual method,
+i.e. those corresponding to <r:null/> elements of <r:var>i</r:var>.
+For the non-<r:null/> entry, we define the method in the
+class corresponding to the inherited method,
+<r:code>
+i[[2]]$class@name
+</r:code>
+which is A.
+We can find the same information for D::foo(int)
+<r:code>
+i = getInheritedMethod(resolvedMethods[["D"]][[1]], resolvedMethods)
+i$class@name
+</r:code>
+For W, we get
+<r:code>
+getInheritedMethod(resolvedMethods[["W"]][[1]], resolvedMethods)
+<r:output>
+"C :: multi ( const C * this, int a, double b )"
+</r:output>
+</r:code>
+identifying the inherited method in C.
+To get the one for A, we specifically tell it to look in the
+ancestor classes along that part of the hierarchy:
+<r:code>
+getInheritedMethod(resolvedMethods[["W"]][[1]], resolvedMethods, "A")
+</r:code>
+And if A had a parent class, we would specify that also
+<r:code>
+getInheritedMethod(resolvedMethods[["W"]][[1]], resolvedMethods, c("A", getBaseClasses(classes[["A"]])))
+<r:output>
+[1] "A :: multi ( const A * this, int a, double b )"
+</r:output>
+</r:code>
+Now, this tells us that we need to define methods for A_multi and
+B_multi that are specialized to this class W.
+</para>
+
+<para>
+
+<r:code>
+defs = lapply(classes, 
+               createClassBindings, tu, types = types, resolvedMethods = resolvedMethods, useClassNameMethod = FALSE)
+</r:code>
+
+<r:code><![CDATA[
+con = file("dispatch.R", "w")
+sapply(defs, writeCode, "r", file = con)
+close(con)
+
+con = file("classes.cc", "w")
+writeIncludes(c('"dispatch.h"', '<Rinternals.h>', '<Rdefines.h>', '"RConverters.h"'), con)
+sapply(defs, writeCode, "native", file = con)
+close(con)
+]]></r:code>
+
+
+<sh:code>
+R CMD SHLIB dispatch.cc Rdispatch.cc classes.cc
+</sh:code>
+
+<r:code>
+library(RAutoGenRunTime)
+dyn.load("dispatch.so")
+source("dispatch.R")
+</r:code>
+
+
+
+<r:code>
+a = A()
+A_other(a)
+A_staticMethod()
+A_foo(a, 1L)
+A_foo(a, 1)
+A_bar(a, 1L)
+A_bar(a, 1L, 2)
+
+b = B()
+
+foo(b, 1L)
+foo(b, 1)
+foo(as(b, "APtr"), 1)
+
+c = C()
+c$foo(1)
+c$foo(1L)
+</r:code>
+
+No method for coercing this numeric to an integer.
+<r:code eval="false">
+A_bar(a, 1)
+</r:code>
+</para>
+
+<para>
+We find all the methods for each class and then
+unlist them.
+<r:code>
+tt = unlist(resolvedMethods, recursive = FALSE)
+tt = tt[!sapply(tt, is, "ResolvedNativeClassDestructor")]
+names(tt) = gsub(".*\\.", "", names(tt))
+</r:code>
+If we use the un-classed, general names, i.e. foo rather
+than A_foo,
+then we only need to find the names of the parameters
+of the method with the most parameters within each
+named method:
+<r:code>
+sigs =
+ tapply(tt, names(tt), function(x) {
+                          i = sapply(x, function(x) length(x$parameters))
+                          names(x[[ which.max(i) ]]$parameters)
+                      })
+</r:code>
+Then we can pass this list as signatures
+for the methods with more than one instance
+within and/or across classes.
+<r:code>
+i = table(names(tt))
+sigs[ names(i)[ i > 1] ]
+</r:code>
+
+
+Now, we can figure out which are inherited,
+which are 
+
+</para>
+
+
+<para>
+Consider the call
+<r:code>
+multi(as(W(), "C"), 1L, 1)
+</r:code>
+We might expect this to invoke the C::multi(int, double) method.  In
+fact, it doesn't. On my machine, it calls A::foo(int) which seems
+rather strange.
+Some thought allows us to see what is going on.
+And if we compare this with  the direct invocation
+<r:code>
+.Call("R_W_multi_p1W_int_double", w, 1L, 1, "C")
+</r:code>
+which gives us the correct result (calling C::multi(int, double)), we
+can have some idea what is in effect here.  In this latter call, we
+are explicitly invoking <![CDATA[This->C::multi(1L, 1)]]> and obtain
+the desired result.  In the other case, we are treating the W object
+as a simple pointer and performing a simple cast to treat it as a
+pointer to an instance of class C.  And so the resulting C++-level
+object is a confused version of a C object.  We might be better of
+trying a dynamic cast:
+<r:code>
+myC = .Call("R_C_cast", W())
+multi(myC, 1L, 1)
+</r:code>
+
+</para>
+
+<para>
+When we process B::foo(double), for example,
+we need to recognize that in the parent
+</para>
+
+</section>
+
+<section>
+<title>References</title>
+
+<ulink url="http://carcino.gen.nz/tech/cpp/multiple_inheritance_this.php#example_code">
+Multiple inheritance and casting.
+</ulink>
+
+</section>
+
+</article>

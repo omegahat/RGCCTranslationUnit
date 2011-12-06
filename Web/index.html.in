@@ -1,0 +1,203 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title></title>
+<link rel="stylesheet" href="http://www.omegahat.org/OmegaTech.css">
+</head>
+
+<body>
+<h1>RGCCTranslationUnit</h1>
+<p align="right"><a href="@TAR_FILE@">@TAR_FILE@</a></p>
+This package provides a mechanism in R to process
+C and C++ source code.  This will then allows us to
+<ul>
+  <li> find  variable and routine declarations,
+  <li> find definitions of data structures, classes, and enumeration
+  <li> analyze the body of a routine and identify related routines
+</ul>
+
+Given this information, we can
+<ul>
+  <li> automate the creation of bindings to routines and data
+  structures</li>
+  <li> generate registration information for an R package using native
+  routines</li>
+  <li> use source code as data for statistical analysis of software itself.</li>
+</ul>
+
+The package provides R-level functionality and classes for working
+with translation unit dumps from GCC of source code. One uses GCC to
+create a .tu file which represents the structure of the source code in
+a low-level format. Currently, this information is read into R using a
+Perl module <a href="">GCC::TranslationUnit</a>.  This is accessed
+from within R via the <a href="http://www.omegahat.org/RSPerl" >RSPerl
+package</a>.  We have developed an almost equivalent C++ based parser
+that we are currently in the process of integrating into the package
+to remove the dependency on RSPerl.  A new version of the package will
+be available at the beginning of July.
+
+
+
+<h3>Software</h3>
+
+The current version works but is in the middle of a transition to a
+C++ parser and the setup fits my needs rather than being a robust
+installation for others.  However, the basics of processing the types,
+finding the definitions of routines, classes, methods, data
+structures, enumerations, etc.  are working.  I am adding support for
+generating bindings and creating registration information as useful
+examples of how this material can be used.  I am using this
+specifically to generate bindings for R to the <a
+href="http://www.wxWidgets.org" >wxWidgets</a> GUI toolkit in the <a
+href="http://www.omegahat.org/RwxWidgets" >RwxWidgets</a>.
+
+<h2>Documentation</h2>
+<dl>
+  <dt>
+  <li> <a href="RGCCTranslationUnit.pdf">Slides </a>from a talk
+      presented at  the <a href="http://www.stat.auckland.ac.nz/dsc-2007/">DSC 2007 in New Zealand</a>.
+  <dd>
+  <dt>
+  <li> <a  href="http://eeyore.ucdavis.edu/duncan/Review/Papers/RGCCTU.pdf">A paper</a> based on that talk
+      and the package.
+  <dd>
+
+  <dt>
+  <li> Some documents about different aspects of the package.
+  <dd> These are "works in progress" and some are more in the spirit
+      of notes to myself.
+      <dl>
+
+	<dt>
+	<li> Overview <a href="overview.xml">XML</a>, <a href="overview.html">HTML</a>, <a href="overview.pdf">PDF</a>
+	<dd>
+	<dt>
+	<li> Guided tour <a href="intro.xml">XML</a>, <a href="intro.html">HTML</a>, <a href="intro.pdf">PDF</a>
+	<dd>
+
+	<dt>
+	<li> Diagrams of <a href="flow.jpg">the basic workflow</a> for
+	generating bindings and
+	      of the <a href="codeFlow.pdf">R commands used in the steps</a>.
+	<dd>
+	    
+	<dt>
+	<li> Derived classes <a href="derivedClasses.xml">XML</a>, <a href="derivedClasses.html">HTML</a>, <a href="derivedClasses.pdf">PDF</a>
+	<dd>
+
+	<dt>
+	<li> Native Registration <a href="registration.xml">XML</a>, <a href="registration.html">HTML</a>, <a href="registration.pdf">PDF</a>
+	<dd>
+
+	<dt>
+	<li> In/Out parameters   <a href="outargs.xml">XML</a>, <a href="outargs.html">HTML</a>, <a href="outargs.pdf">PDF</a>
+	<dd>
+
+	<dt>
+	<li> A discussion of one strategy for creating the bindings
+   	     for C++ code, specifically the wxWidgets library.
+	    <a href="mappings.xml">XML</a>, <a href="mappings.html">HTML</a>, <a href="mappings.pdf">PDF</a>
+	<dd>
+	    
+      </dl>
+       
+      
+</dl>
+
+
+<h3>Related Projects</h3>
+The ability to process source code has been something I and others
+have been exploring for some time now.
+<dl>
+  <dt>
+  <li>
+   <a href="http://www.omegahat.org/RSWIG" >RSWIG</a>
+     is work I did last summer to add support for
+    R to the <a href="">SWIG</a> software for generating bindings
+    from C/C++ code to other languages such as Perl, Python, and R.
+    <br>
+    Joseph Wang has since adapted this and work is ongoing to
+    merge the two directions.
+    <P/>
+    SWIG is useful as it offers a language with which
+    "users" can customize the generation of the generated bindings,
+    and can use this same input for different target languages.
+
+    There are two obvious limitations with using SWIG
+    <ol>
+      <li>SWIG is not a compiler and so extracts information about the
+    data structures and routines using a more heuristic parser.
+     It is extremely good, but is not exactly the same as the
+    compiler's view of the code.
+      </li>
+      <li>SWIG does not give us information about
+      the bodies of the routines and so doesn't allow us to analyze
+       the code.  This is not important for those only interested
+      in generating bindings to R or another language.
+      It is an issue for those of us that want a tool for
+      analyzing the code itself.</li>
+    </ol>
+
+  </li>
+  <dd>
+  
+  <dt>
+  <li>The <a href="http://www.omegahat.org/GccTranslationUnit">GccTranslationUnit</a>
+    module is a Python-based tool to read the tu files.</li>
+  
+  <dd>
+</dl>
+
+
+<h3>Why not SWIG?</h3>
+
+I have thought about how to generate reflection interface from C/C++ code for some time - several
+years.  It is not just about generating bindings, although that is
+certainly an important target application.
+It is also about doing code analysis.
+
+<dl>
+  <dt>
+  <li>Want others to be able to modify the
+       binding generation code directly from within R.
+  <dd>
+
+      
+  <dt>
+  <li>Want to be able to get "correct" results from the compiler, and
+    not "pretty close to correct" results from a pseudo compiler/parser.
+    
+  <dd>
+
+  <dt>
+  <li>
+    Want information about the bodies of the routines/methods, and not
+    just
+    the signature information. This is important for code analysis,
+    re-factoring, etc.
+    
+  <dd>
+
+  <dt>
+  <li>
+    SWIG's input language allows the user to control what she wants
+    to have in the bindings, but it is yet another language to
+    understand  and we have one already at our disposal - R.
+  <dd>
+    
+</dl>
+
+
+I started the work on the SWIG bindings for R because
+I feel  that we can use this translation unit approach
+to generate input to SWIG and then leverage that
+mechanism to generate bindings. 
+
+
+
+
+
+<hr>
+<address><a href="http://www.stat.ucdavis.edu/~duncan">Duncan Temple Lang</a>
+<a href=mailto:duncan@wald.ucdavis.edu>&lt;duncan@wald.ucdavis.edu&gt;</a></address>
+<!-- hhmts start --> Last modified: Thu May  4 15:30:14 PDT 2006 <!-- hhmts end -->
+</body> </html>

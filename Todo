@@ -1,0 +1,182 @@
+callGraph and label_stmt
+
+
+Cannot use the same DefinitionContainer for different 
+parsers (node INDECES refer to different nodes),
+but can for different sets of routines, etc. 
+e.g. when we filter on different files.
+
+   May want a mechanism to merge to containers, recognizing duplicates, etc.
+
+
+Allow the caller of the resolveType or parseTU() to inform the
+parser that this is actually C code dumped with a C++ compiler
+but that structs are structs and not C++ClassDefinition.
+
+  [Done]  Put a language field into the parser. Specify this as C or c.
+
+
+For arrays with known dimensions, we are getting in R,
+one less than this value. See msa.h. Is this correct or
+can we do better?
+
+  [Done] Just add one as we are accessing the max field identifying the 
+
+
+In checkSource() should we do the gsub first?
+
+ wxGridCellCoordsArray
+  Sort method as a screwed up second parameter PointerType with NAs for typeName and name.
+ Same with wxGridStringArray
+ This is the function comparator.
+
+
+
+in-out and out variables
+
+default values which are C++-level variables.
+
+Defining new classes with R methods.
+
+p[[576]] and p[[576, convert = FALSE]]
+
+
+
+
+The default values seem to have disappeared in the myClass.cc example
+for ambiguity.
+  Fixed now. Was explictly looking at the args() and not passing the node
+  which would then look at the parms also.   This was only for the 
+  methods, not the functions.
+
+
+
+
+Forward references - see forward.c.
+
+Typedefs for structs.
+  If a record_type has a name that points to a type_decl, return that
+  but with a reference to the actual struct/record type.
+
+typedef struct _Foo  Foo
+gives very different paths for 
+  struct _Foo *x 
+  Foo *y
+
+Connected by the unql.
+  If a pointer_type node  has a name and unql, different from just having a ptd.
+
+  Need a new class for representing pointers to typedefed entities.
+
+
+
+
+Arrays.
+  Check the length of an R vector if we know the array size. - partially complete (see ScoerceToType()).
+ 
+  But in the parameter declarations, we lose this information.
+  int x[3] as a parameter declaration comes in as a int *x.
+  Need to hunt down the information for the array size in the pointer_type.
+   array.c.tu:
+      @13     pointer_type     size: @15      algn: 32       ptd : @25     
+      @15     integer_cst      type: @16      low : 32      
+
+Strings in R and C code.
+
+
+In and Out arguments.
+  stat is a good example.
+  Want to be able to analyze the code. 
+  Or allow the user to specify which are in, out and in/out variables.
+  const declarations would help us greatly.
+
+  Collect the out values as elements in a named list.
+
+
+Handle references or S objects for a struct.
+  e.g. if we have a routine Foo(struct Foo)
+   allow this to be called from S with a FooRef or a Foo object.
+
+
+Add copy/ref flag for calls that return an object for which we might 
+want a reference.
+
+Function pointers.
+   pointer -> typedef -> same pointer
+   Unfortunately, we don't have access to the names of the parameters.
+
+   Rfrom_Callable(ans)
+
+
+convert struct name in the conversion.
+  convertStructFooTypeToR in R_get_zz (array.c)
+  but convertstruct FooType{}ArrayToR
+
+
+Unions.
+  How to determine which field is set/active.
+
+
+<future>
+Create a CodeManager class.
+  manage definitions/catalogs for enumerations, classes, routines, ...
+
+
+Implement a Matlab interface generator to explore how to
+share code and define classes.
+
+Access to C++ classes.
+  fields and methods.
+  Multi-method dispatch.
+</future>
+
+
+<Test>
+
+getConversionToR 
+   enumerations - Almost done.
+
+set method for references. (i.e. obj$field <- value)
+   Basics done. 
+     Add converters for different types.
+
+External pointer extensions.
+  use .allocRef() and can define that differently if we want.
+  Turn back on the class definition when we want.
+
+S Class names for setClass for regular copies of structs.
+  e.g. integer for int.  Using a mapping table currently. Fill in.
+
+
+Enumeration classes.
+   Progressing.
+    RGB typedef isn't getting turned into an S4 class in examples.c
+</Test>
+
+<Random>
+Typedefs for conversions. (?)
+</Random>
+
+<Done>
+Accessors for (global) variables.
+   Done.
+
+Functions without parameter names in C routines.
+  Fixed the reference problem in FunctionDecl->argNames().
+
+Conversion from structures in S to C-level structs needs to respect S4 classes
+and get the slots from these.
+Converters to S objects from Structs need to use S4 classes.
+
+Converters for struct copies. 
+      genCToRStructConverter
+
+
+Finalizations.
+  Added to the routine.
+   (Could make the routine call another that accepts just the size of the allocation but probably easier to do things directly inline for debugging purposes.)
+
+Avoid replications in the S code.
+  Done.  Could avoid doing computations by testing first.
+
+</Done>

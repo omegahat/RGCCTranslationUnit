@@ -1,0 +1,141 @@
+<?xml version="1.0"?>
+
+<article xmlns:omg="http://www.omegahat.org"
+         xmlns:r="http://www.r-project.org"
+         xmlns:s4="http://cm.bell-labs.com/stat/S4">
+
+<section>
+<title></title>
+<para>
+The <omg:pkg>XML</omg:pkg> package provides an interface to 
+the libxml library and its functionality and data structures.
+Similarly, <omg:pkg>Sxslt</omg:pkg> provides an interface
+to the associated libxslt library for transforming
+XML documents via XSL (the eXtensible StyleSheet Language).
+Recently, I was utilizing Sxslt for creating R documentation
+and wanted to use the XInclude facilities to incorporate
+parts of another document into the one I was processing.
+That is one of the features that I hadn' manually provided
+the bindings. 
+The idea is that one processes a document and then
+applies one or more options to it to force
+things like XInclude and entity substitution,
+control how XInclude nodes are formed, 
+control error and warning reporting,
+concatenate CDATA content into surrounding text nodes,
+and so on. These options are controlled by 
+using an OR of enumerated values. Specifically,
+there are 17 such values that can be combined. 
+</para>
+
+<para>
+The simple idea is that we create a libxml.c file which includes the
+primary header file from the libxml library.  Then we generate the TU
+file by passing the appropriate flags to GCC, i.e. those
+for the libxml2 configuration and the -fdump-translation-unit.
+Then we read this TU file into R with
+<r:code>
+library(RGCCTranslationUnit)
+p = parseTU("libxml.c.t00.tu")
+</r:code>
+And we get the enumeration nodes via
+<r:code>
+e = getEnumerations(p)
+</r:code>
+The names of this list tell us the names of the C enumerations.
+(Those with numbers are anonymous or unnamed enumerations.)
+These are just the nodes, so we resolve this into the actual definition
+for the one we want, xmlParserOption.
+<r:code>
+tt = DefinitionContainer()
+opts = resolveType(e[["xmlParserOption"]], p, tt)
+</r:code>
+It is the <s4:slot>values</s4:slot> slot that contains the
+actual definitions of interest to us.
+
+<r:code>
+opts@values
+</r:code>
+We can create corresponding R variables with those values,
+i.e.
+<r:var>XML_PARSE_RECOVER</r:var>.
+
+Firstly, we need to be able to OR these together.
+We can use the <r:func>bitlist</r:func>
+as in
+<r:code eval="false">
+bitlist(XML_PARSE_XINCLUDE, XML_PARSE_NONET)
+</r:code>
+We might also want to use
+<r:code eval="false">
+ XML_PARSE_XINCLUDE | XML_PARSE_NONET
+</r:code>
+To do this, we need the values to have a class
+with a method for the | operator.
+So when we create the R variables, we need to use this class
+and define the method.
+We can do this directly with the R function
+that generates and writes out the code
+for this definition.
+<r:code>
+writeCode(opts, "r", "/tmp/xmlParserOpts.R")
+</r:code>
+And then we can load this back into an R session
+<r:code>
+source("/tmp/xmlParserOpts.R")
+</r:code>
+and our commands above will "simply" work
+and we can use these in our R commands.
+</para>
+
+<para>
+As an additional convenience, we can see that the values have a common 
+prefix - XML_PARSE. It would be easier if we could
+also refer to them in a known context without this prefix,
+e.g. <r:code eval="false">as(c("NONET", "XINCLUDE"), "xmlParserOption")</r:code>.
+Indeed, it would be even more convenient if we could use lower-case
+words, e.g. <r:code eval="false">as(c("nonet", "xinclude"), "xmlParserOption")</r:code>.
+
+
+</para>
+
+<section>
+<title>Routines</title>
+<para>
+<r:code>
+r = getRoutines(p)
+</r:code>
+This takes a while to say the least as there are 1879 routines.  (We
+could filter these based on being in libxml, but that is a little
+tricky as we don't know the names of the include files. See below)
+Unfortunately by just including libxml/parser.h and no other include
+files, we miss the functionality we want. This is where we may have to
+add header files to our .c file and regenerate the TU.  In our case,
+we add libxml/xinclude.h.  In many cases, we can figure out which
+header files to include more directly.
+Then we can find the one in which we are interested.
+</para>
+</section>
+
+<section>
+<title>Filtering</title>
+<para>
+Here we try to filter out the system definitions and routines.
+One approach is to find the names of all the files in the
+include directory for libxml.
+<r:code>
+system("xml2-config --cflags")
+</r:code>
+
+<r:code>
+z = list.files('/usr/local/include/libxml2/libxml', recursive = TRUE)
+</r:code>
+Then we can use these with
+<r:code>
+rr = getRoutines(p, files = z)
+</r:code>
+And we do indeed see a large reduction, down to 698 routines.
+</para>
+</section>
+</section>
+</article>

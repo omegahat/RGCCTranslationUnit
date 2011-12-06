@@ -1,0 +1,345 @@
+<?xml version="1.0"?>
+
+<article xmlns:r="http://www.r-project.org">
+<section>
+<title></title>
+
+<para>
+<r:code id="tu">
+library(RGCCTranslationUnit)
+initTUOptions()
+tu = parseTU("main.cc.001t.tu") 
+klasses = getClassNodes(tu, "Classes")
+names(klasses)
+</r:code>
+
+<r:code id="methods">
+classDefs = getClassDefs(tu, klasses = klasses)
+       # change the order of the list to parallel classDefs.
+klasses = klasses[names(classDefs)]
+
+methods = lapply(klasses, getClassMethods, dropArtificial = FALSE, dropOperators = FALSE)
+resolved.methods = lapply(methods, resolveType, tu)
+</r:code>
+
+<r:code id="routines">
+  # ??? Resolve the routines
+routines = resolveType(getRoutines(tu, "Classes"), tu)
+dispatchInfo = numUniqueArgs(c(collapseMethods(resolved.methods), routines))
+genericDefs = computeOverloadedSignatures(resolved.methods, routines)
+resolved.methods = filterInheritedVirtualMethods(resolved.methods, classDefs)
+</r:code>
+
+
+<r:code id="derived">
+derivedClasses = lapply(names(resolved.methods),
+                           function(id)
+                               createDerivedClass(id, tu, classNodes = klasses, 
+                                                   methods = resolved.methods, classDefs = classDefs,
+                                                    signatures = genericDefs, dispatchInfo = dispatchInfo))
+names(derivedClasses) = paste("R", names(resolved.methods), sep = "")
+</r:code>
+</para>
+
+
+<r:code thread="noresolve" eval="false">
+tu = parseTU("main.cc.001t.tu") 
+klasses = getClassNodes(tu, "Classes")
+classDefs = getClassDefs(tu, klasses = klasses)
+     # change the order of the list to parallel classDefs.
+klasses = klasses[names(classDefs)]
+methods = lapply(klasses, getClassMethods, dropArtificial = FALSE, dropOperators = FALSE)
+ #???
+methods = filterInheritedVirtualMethods(methods, classDefs)
+
+routines = getRoutines(tu, "Classes")
+genericDefs = computeOverloadedSignatures(methods, routines)
+dispatchInfo = numUniqueArgs(c(collapseMethods(methods), routines))
+</r:code>
+
+
+<para>
+<note><para>This is no longer necessary as the computations to identify this ambiguity
+are done within the generation of the code for the derived classes.
+</para></note>
+In the original version, we had to fix up an ambiguity identified by the compiler
+in the case of the newly derived class RC and the method p which
+is inherited from both MyOtherClass and A.  We can do
+this explicitly in R by changing the generated code.  The ambiguity is
+a result of the multiple inheritance with three different methods
+MyOtherClass::p(bool) and A::p(const char *name) and A::p().  Now, in
+our case, the compiler should be able to determine that it is the
+first that we should be using as the argument is explicitly a bool
+type. But the compiler raises an error.
+</para>
+<para>
+It would be potentially quite expensive to identify these for all
+methods ahead of time So for now, we require the "user" of this
+package to modify the code before writing it to a file.  We can do
+this reasonably easily by fetching the text of the C routine (don't
+forget the @code) and doing a simple text substitution.
+<r:code id="fixDerived" eval="false">
+id = 'p(MyOtherClass * this, bool b)'
+derivedClasses$RC$methodImplementation[[id]]@code = gsub("C :: p \\(", "MyOtherClass :: p\\(", derivedClasses$RC$methodImplementation[[id]]@code)
+</r:code>
+It would be good if we had a structure to represent this so we could set it more directly
+rather than with text substitution.
+Also, if we have to deal with multiple methods of the same name, we would have an issue
+in identifying which method is which. 
+</para>
+<para>
+
+<r:code id="array">
+copy = resolveType(klasses[["Copy"]], tu)
+array = generateCopyArrayToR(copy@fields$data@type, addDimensions = FALSE)
+</r:code>
+
+<r:code id="writeDerived">
+con = file("RClasses.cc", "w")
+writeIncludes('"Classes.h"', con)
+writeCode(array$native, "native", file = con)
+sapply(derivedClasses, writeCode, "native", file = con)
+close(con)
+
+con = file("RClasses.R", "w")
+sapply(derivedClasses, writeCode, "r", file = con)
+close(con)
+</r:code>
+
+<r:code id="ifaces">
+ifaces = lapply(names(klasses),
+                function(i) createClassBindings(klasses[[i]], tu, resolvedMethods = resolved.methods, 
+                                                 classDefs = classDefs, signatures = genericDefs, dispatchInfo = dispatchInfo))
+names(ifaces) =  names(klasses)
+</r:code>
+
+
+<r:code id="writeIfaces"><![CDATA[
+writeCode(ifaces, "native", "IFaces.cc", includes = c('"Classes.h"', '<RDerivedClass.h>'))
+writeCode(ifaces, "r", "IFaces.R")
+]]></r:code>
+
+<r:code id="writeGenerics">
+writeCode(genericDefs, "r", "generics.R")
+</r:code>
+
+<r:code id="routines">
+routineCode = lapply(routines, createMethodBinding, signature = genericDefs, dispatchInfo = dispatchInfo)
+</r:code>
+
+<r:code id="writeRoutines"><![CDATA[
+writeCode(routineCode, "r", "routines.R")
+writeCode(routineCode, "c", "routines.cc", includes = c('"Classes.h"', '<RConverters.h>'))
+]]></r:code>
+</para>
+<para>
+
+<r:code id="cast"><![CDATA[
+resolved.classes = lapply(klasses, resolveType, tu)
+cast = 
+  lapply(resolved.classes,
+         function(def) {
+	   
+	   lapply(def@ancestorClasses, 
+                   function(to) 
+                     createDynamicCastCode(def@name, to))
+         })
+
+writeCode(cast, "native", file = "Cast.cc", includes = c('"Classes.h"', "<RConverters.h>"))
+writeCode(cast, "r", file = "Cast.R")
+]]></r:code>
+
+</para>
+</section>
+
+
+
+<section>
+<title>Testing the Code</title>
+
+<r:code id="load">
+library(RAutoGenRunTime)
+dyn.load("foo.so") 
+
+source("IFaces.R")
+source("RClasses.R")
+source("routines.R")
+</r:code>
+
+<r:code>
+Scale(TRUE) # -203
+Scale(1, TRUE, "foo", 1) # -101
+</r:code>
+
+<r:code>
+a = newA()   # was just A().  Option!
+A_set_a(a, 100)
+A_get_a(a)
+
+names(a)  # note the names on the names vector identifying the class in which the field is defined.
+a[["a"]]
+a[["a"]] = 1
+a[["a"]]
+
+b = newB()
+c = newC()
+  # C has a shadowed field named "b"
+names(b)
+names(c)
+
+c[["b"]] = 3
+if(isGeneric("init"))
+  init(c)
+
+ # Show how to access overloaded/shadowed fields
+c[["B::b"]]    # 25
+c[["B::b"]] = 101 
+c[["B::b"]]    # 101
+c[["b"]]       # 2
+
+showFields(c)
+
+foo(a)  # -1
+foo(b)  # -1 as inherited from A
+foo(c)  # 3  #should be 3, method C::foo
+             # we need the second parameter in the signature as "numeric"/"integer"
+             # since C extends A and so foo(C, [integer]) conflicts with foo(A) (and hence foo(C))
+             # dispatchInfo should be 2 for this.
+foo(c, 10)  # 10L
+
+
+mine(a) # 1
+mine(b) # 2
+mine(c) # 2 from B::mine()
+
+yours(a) # 1
+yours(b) # 101
+yours(c) # 201
+</r:code>
+
+<r:test>
+foo(as(c, "A")) 
+p(c, TRUE)  #XXX ambiguous
+</r:test>
+
+
+Another test of shadowed fields
+<r:code>
+z = newZ()
+names(z)
+names(names(z))
+</r:code>
+
+<r:code>
+z[["field1"]]           # 1
+z[["Y::field1"]]        # 1 
+z[["MyClass::field1"]]  # -1
+</r:code>
+
+<r:code>
+my = newMyClass()
+
+</r:code>
+
+</section>
+
+
+<section>
+<para>
+This illustrates how we can override an operator in our derived class.
+<r:code>
+copy = newCopy()
+subs(copy, 2L)
+sapply(subs(copy, 2L)
+
+gen = 
+function(data = rpois(10, 4)) {
+  list(el = function(this, i) {
+               cat("Fetching element", i, "\n")
+               data[i]
+            })
+}
+
+robj = gen()
+robj$el(NULL, 3)
+rc = newRCopy(list("[](integer)" =  robj$el))
+subs(rc, 3L)
+</r:code>
+</para>
+<para>
+
+Here we use a function that returns a double and the coercion is done
+by the C++ code.
+<r:code>
+rc = newRCopy(list("[](integer)" =  function(this, i) rnorm(1, 20)))
+subs(rc, 3L)
+
+rc = newRCopy(list("[](integer)" =  function(this, i) as.integer(rnorm(1, 20))))
+subs(rc, 3L)
+
+rc = newRCopy(list("[](integer)" =  function(this, i) as.numeric(i)))
+subs(rc, 3L)
+sapply(1:10, function(i) subs(rc, i))
+</r:code>
+</para>
+</section>
+
+
+
+<section>
+<title>Test code</title>
+
+<r:code>
+source("run.R")
+
+m = newMyClass()
+draw(m, 1L)
+draw(m, 1)  #XXX
+
+p(m, 1, 2)
+p(m, 1)  # with default argument for y
+</r:code>
+
+<r:code>
+a = newA()
+p(a, "bob")
+a$p("bob")
+</r:code>
+
+<r:code>
+Scale(1.2, TRUE, "bob", 2L)  # -101<r:plot><![CDATA[
+
+]]></r:plot>
+Scale(TRUE)  # -203
+</r:code>
+
+
+
+
+Errors
+<r:code> 
+p(m) # MyClass::p(int, int) - dispatches correctly but no default values for x and y
+
+p(a) # error since protected. Should we just fail via missing S4 method or put in a method to provide a message about being protected!
+</r:code>
+
+<r:code>
+getNativeMethodIds("RB")
+rb = newRB(list("foo" = function(this){ cat("In foo\n"); 1L}))
+foo(rb)
+
+mine(rb)  # calls 
+yours(rb) # 101
+</r:code>
+
+
+</section>
+
+
+<section>
+<r:test>
+tmp = createClassBindings(klasses$MyClass, tu, resolvedMethods = resolved.methods, classDefs = classDefs)
+</r:test>
+</section>
+
+</article>

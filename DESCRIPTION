@@ -1,0 +1,56 @@
+Package: RGCCTranslationUnit
+Title:  R interface to GCC source code information
+Description:  This package provides rich facilities for
+  extracting meta-data about C/C++ code to get a description
+  of variables, routines, data structures, classes and methods.
+  We use these to programmatically explore and summarize native 
+  code and importantly, to generate R bindings to it (or for other 
+  languages). This differs from SWIG in that a) it makes the
+  information available to R programmers directly and so the
+  analysis of the code and binding generation can be done
+  entirely within R, and b) it provides more information
+  than SWIG does, e.g. allowing us to examine the bodies of 
+  routines/methods and so compute call graphs, analyze the 
+  use of global variables. This holds some promise for
+  helping to automate the conversion of C code in R packages
+  to thread-safe code for use with in-process concurrent threads,
+  and general refactoring.
+Version: 0.6-0
+Maintainer: Duncan Temple Lang <duncan@wald.ucdavis.edu>
+Author: Duncan Temple Lang <duncan@wald.ucdavis.edu>
+Depends: methods
+Imports: bitops, Combinations, RAutoGenRunTime (>= 0.2-0)
+SystemRequirements: libpcre
+Suggests: bitops, Combinations, graph
+Enhances: RSPerl, graph 
+License: GPL
+LazyLoading: yes
+Collate:  ConfigVars.R 
+          parse.R perlClasses.R
+	  utils.R
+          TUParser.R  classes.R 
+          types.R generics.R cppParser.R nodeClasses.R  intTypes.R
+          perlParser.R findDecl.R getValue.R 
+          bindings.R getRTypeName.R
+          codeObjects.R
+	  write.R generate.R 
+          navigate.R typeContainer.R 
+          getElements.R  resolveType.R
+          accessors.R registration.R readDeps.R enums.R 
+	  derivedClass.R methods.R
+          defines.R getNext.R
+          typeMap.R onAttach.R struct.R   getNodeName.R
+          convertValueToR.R convertRValue.R getNativeDeclaration.R coerce.R 
+          callGraph.R findLength.R inoutArgs.R  asString.R
+	  dynamicCast.R getClassNodes.R findFF.R virtual.R processClasses.R
+	  constants.R
+	  globalVars.R freeVariables.R globalInfo.R
+          inherited.R show.R overloaded.R array.R
+          doc.R parseOriginalTree.R 
+          addToNamespace.R perlConverters.R 
+          modifyVirtual.R S4dispatch.R options.R FunctionPointers.R 
+          BuiltinTypeTable.R signature.R
+          includeGraph.R  sexp.R
+Notes: This includes a copy of GCCTranslationUnit by Ashley Winters
+       with modifications to facilitate the interaction with R.
+URL: http://www.omegahat.org/RGCCTranslationUnit

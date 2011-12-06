@@ -1,0 +1,66 @@
+<article xmlns:r="http://www.r-project.org"
+         xmlns:sh="http://www.shell.org">
+
+<question>
+<para>
+How do I find all classes that are derived - either directly or indirectly - from a particular
+class.
+</para>
+<answer><para>
+The answer is to use <r:func>getBaseClasses</r:func>.
+Let's take the wxWidgets class hierarchy and find all the classes that
+are derived from wxWindow.
+<r:code>
+wx  = parseTU("~/Projects/org/omegahat/R/RwxWidgets/autoGenerate/wx.cpp.001t.tu")
+classes = getClassNodes(wx)
+wxWindow = classes[["wxWindow"]]
+
+iswxWindow = sapply(classes, 
+                     function(classNode)
+                        "wxWindow" %in%  getBaseClasses(classNode, recursive = TRUE))
+
+names(classes)[iswxWindow]
+</r:code>
+And we get 125 of these.
+</para></answer>
+</question>
+
+<question>
+<para>
+How do I generate the R and C++ code to interface to a C++ class by itself?
+</para>
+<answer>
+<para>
+First, read the TU and get the class nodes, e.g.
+<r:code>
+wx  = parseTU("~/Projects/org/omegahat/R/RwxWidgets/autoGenerate/wx.cpp.001t.tu")
+classes = getClassNodes(wx)
+</r:code>
+</para>
+<para>
+
+Now, the phrase "by itself" assumes that you won't generate other code.
+But what about the ancestor classes and their methods? Should we 
+generate code for those methods  as if they were local to this
+class? What about derived classes implemented in R?
+</para>
+
+<para>
+Next, we use <r:func>createClassBindings</r:func> as
+<r:code>
+wxMsgDialog = createClassBindings( classes[[ "wxMessageDialog" ]], wx, "wxMessageDialog")
+</r:code>
+Then we write the code along with any include files we need,
+<r:code><![CDATA[
+writeCode(wxMsgDialog, "native", "/tmp/wxMessageDialog.cpp", includes = c("<wx/msgdlg.h>", '"RConverters.h"'))
+]]></r:code>
+and then we can compile, e.g.
+<sh:code>
+g++ `wx-config --cflags` -I`R RHOME`/include -I. -c wxMessageDialog.cpp 
+</sh:code>
+assuming <file>RConverters.h</file> is in the current directory.
+</para>
+</answer>
+</question>
+
+</article>

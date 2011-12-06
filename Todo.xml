@@ -1,0 +1,3150 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml-stylesheet type="text/xsl" href="../../../../Docs/XSL/Todo.xsl" ?>
+<?xml-stylesheet type="text/xsl" href="../../../../../../../Classes/StatComputing/XDynDocs/inst/XSL/OmegahatXSL/Todo.xsl" ?>
+<!-- <?xml-stylesheet type="text/xsl" href="http://www.omegahat.org/Todo.xsl" ?> -->
+
+
+<topics xmlns:r="http://www.r-project.org" xmlns:c="http://www.c.org">
+
+<ulink url="../../../../R/RwxWidgets/Todo.html">RwxWidgets</ulink>
+
+
+<topic>
+<title>C++ parser</title>
+
+<item>
+Handle non-primitive/complex default values.
+Lots of changes to <r:expr>!is.na(sapply(params, el, "defaultValue"))</r:expr>
+<br/>
+See inst/examples/defaults.cpp for examples with default values.
+</item>
+
+<item status="done">
+Convert default value of 0 to NULL where appropriate, i.e.
+for pointers, etc. and not leave as a number.
+<br/>
+Should we do this when we initially pull the method together (getClassMethods() and makeRoutineDescription() and getParameters().
+Do it with getValue(). Can't do it there as we are dealing with integer values and we need to know that we have a pointer.
+We may need to delay this until we have resolved the type.) or in toRInitializer (called from createMethodBinding())?
+<br/>
+CNULLValue in RAutoGenRunTime now and we use toRInitializer() to generate the relevant code.
+
+</item>
+
+<item status="done">
+Problem with default arguments for a RFunctionDefinition.
+When coercing this to a string, we get the warning message
+<r:error>
+Warning in values[i] = paste("=", defaults[i]) :
+  number of items to replace is not a multiple of replacement length
+</r:error>
+Problem is that we have more parameters than we have value.
+So we have to align these. Is this coming from an overloaded
+method and so there isn't a one-one mapping between
+the default values and the parameters.
+<br/>
+Switched the coercion method for RFunctionDefinition to character in codeObjects.R
+to use which(i) rather than i where i is logical.
+</item>
+
+<item status="done">
+getValue(GCC::Node::real_cst) is getting just the integer part.
+See value.cc.001t.tu.
+ tu = parseTU(system.file("examples", "value.cc.001t.tu", package = "RGCCTranslationUnit"))
+ tu[[23]][["valu"]]
+See also
+ getValue(tu[[53]])
+</item>
+
+<item status="done">
+For string_cst nodes, change the field named strg to string ?
+To be consistent with identifier_node.
+Done manually in NodeClasses.c. So don't regenerate the code there programmatically.
+</item>
+
+<item status="done">
+Parse strings with the white space at the end correctly.
+See value.cc.001t.tu
+ tu = parseTU(system.file("examples", "value.cc.001t.tu", package = "RGCCTranslationUnit"))
+ tu[[39]][["stringg"]]
+<br/>
+Don't we already take the length (the lngt field) into account. So this is a "mistake" in the TU
+output, perhaps counting the \0.
+</item>
+
+
+<item status="done">
+getValue() for a GCC::Node::negate_expr.
+Deal with the op 0: @node and make certain
+it is parsed correctly.
+</item>
+
+<item topic="C++">
+When there is no public constructor, don't create one.
+<br/>
+See protectedConstructor.cc in inst/examples/
+<br/>
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU("protectedConstructor.cc.001t.tu")
+k = getClassNodes(tu)
+b = RGCCTranslationUnit:::createClassBindings(k$Foo, tu)
+</r:code>
+</item>
+
+<item topic="C++">
+When there are overloaded constructors, generate the R code.
+Is this done?
+</item>
+
+
+<item status="check">
+Allow the R programmer using TU to specify their own class hierarchy
+or base class.  Isn't this already feasible? Yes,
+defaultBaseClass in  RGCCTranslationUnit:::createClassBindings.
+</item>
+
+
+<item topic="C++"> 
+createDerivedClass() is broken.
+<br/>
+In what way?
+</item>
+
+<item topic="C">
+Why does the computeGlobalConstants() example
+return code of the form "x &lt;- x" for the variable
+x? What does that do? Is it an active binding thing?
+</item>
+
+<item>
+R/enums.R  
+prefix is a global variable in
+setMethod("generateEnumCConverters",  c("BitwiseEnumerationDefinition", "character"),...)
+<br/>
+Added now, but not certain where it is used.
+</item>
+
+<item status="done">
+Function pointer types aren't printing their parameters when
+show()/print()'ed. See inst/examples/libpcap/pcap.R
+and the object in pcap_t@type@fields$cleanup_op@type
+<br/>
+Make certain everything is resolved. Indeed.
+The problem was an off by one.
+<br/>
+</item>
+<item status="done">
+Why is the name (pcap_t@type@fields$cleanup_op@type@type@parameters[[1]]@type@type@name)
+pcap_setup_dump::f.  (See pcap.R) Fixed now!
+</item>
+<item status="done">
+Arrays are not printing correctly
+errbuf in pcap_t in pcap.R
+<br/>
+Check multi-dimensional arrays.
+</item>
+
+<item>
+as(, "character") method for nodes.
+Almost done. Just add the type.
+Or perhaps the print/show method can do this.
+</item>
+
+<item topic='C++' status="done">
+Can we detect static methods within a class, e.g.
+Seconds() in wxTimeSpan. See inst/examples/wxWidgets/datetime.cc
+<br/>
+
+<r:code>
+tu = parseTU("datetime.cc.t00.tu")
+classes = getClassNodes(tu)
+ts = getClassMethods(classes$wxTimeSpan)
+sc = resolveType(ts$Seconds, tu)
+class(sc)  # includes StaticMethod
+</r:code>
+
+</item>
+
+<item topic='C++'>
+record_type and getNodeSource() for 
+inst/examples/nifticlib/nifti.c.t00.tu
+
+<r:code>
+nifti.tu = parseTU("inst/examples/nifticlib/nifti.c.t00.tu")
+ds = getDataStructures(nifti.tu)
+names(ds[["FSLIO"]])
+</r:code>
+Seems srcp is repeated. 
+<br/>
+Actually seems like it isn't there now.
+<br/>
+Looks like getDataStructures() is returning the struct and not the
+typedef. And the typedef has the source.
+</item>
+
+<item topic="C++">
+Identify constructors, operators, etc. by a class in getClassMethods.
+</item>
+
+
+<item topic="C++ parser" status="done"> 
+For note: operator name, put the operator back with the name when
+pushing this as a note for completeness.
+e.g. wx[[60249]][["note"]]
+</item>
+
+<item topic="C++ parser" status="done"> 
+"note" should always(?) be a vector of strings not a single string!
+wx[[60249]][["note"]]
+wx[[60254]][["note"]]
+</item>
+
+
+<item topic="C++" status="done">
+Make resolveType work the same with with a function_decl and an object
+generated by getClassMethods for the same node.
+Seems true for both parsers.
+<br/>
+main.cc.001.tu  node 712.
+<r:code>
+b = getClassNodes(tu)[["B"]]
+m = getClassMethods(b)
+x = resolveType(m[["b_m"]])
+y = resolveType(tu[[712]])
+</r:code>
+</item>
+
+<item topic="C++" status="done">
+For operator methods such as [], define R methods
+setMethod("[", c("Copy", "numeric", "missing"),
+           function(x, i, j, ..., drop = TRUE) {
+	      subs(x, i)
+           })
+</item>
+
+<item topic="C++">
+For operator methods, create R methods.
+i.e. we need to use the operator &amp;, &lt;, etc.
+form, rather than the name of the function, e.g. subs
+where appropriate, e.g.
+<![CDATA[+, -, *, /, %, ^, &., !, !=]]>
+<br/>
+Group methods?
+</item>
+
+<item topic="array">
+Potentially make access to an array vectorized so, e.g.
+in main.cc in inheritance for the class Copy
+copy = newCopy()
+subs(copy, 1:3) 
+would give the first three elements.
+</item>
+
+<item topic="C++" status="done">
+examples in make.xml for foo(c) not dispatching to foo(A)
+</item>
+
+<item topic="C++">
+adding .inherited even when the method is not inherited from any base class.
+In createMethodBinding()?
+<br/>
+This is coming from the generic. So we just want to mark it as missing if
+we are not dealing with a virtual method or if it is virtual
+and defined first here in the class hierarchy - can we tell this!
+Somewhat as we filter the methods so it shouldn't be here if it is inherited.
+</item>
+
+<item topic="C++">
+When dispatching for an integer, if we know that there are no other methods
+that have a numeric in that position, we should allow a numeric rather than
+restrict to an integer.
+</item>
+
+
+<item topic="C++" status="done">
+Need to add "missing" to signature when there are no more parameters
+in definition,
+e.g. 
+examples in make.xml for foo(c, "bob")  is calling foo(c) and silently
+ignoring the second argument.
+<br/>
+See the end of createMethodBinding().
+<br/>
+See createRCode() in bindings.R
+</item>
+
+<item topic="C++" status="low">
+Provide option for killing the names on the names vector giving the 
+class in which the field is defined.
+</item>
+
+
+
+<item topic="C++ Derived" status="done">
+Duplicating constructors in new native parser.
+</item>
+
+<item topic="C++ parser" status="done">
+Add the handling of mapping of virt to virtual in the  classFuncs.R
+functions. This is for the spec field.
+</item>
+
+<item topic="C++ parser" status="done">
+r__inherited parameter is duplicated in C++ code for regular methods (not overridden)
+</item>
+
+<item topic="C++ parser">
+Check isCopyConstructor works for Perl parser.
+Should basically do so.
+</item>
+
+<item topic="C++ parser" status="low">
+The spec: field does not have to always go through
+the name mapping facility, i.e. internString(, true).
+Only for function_decl.
+<br/>
+wx[[60679]][["spec"]]
+</item>
+
+
+<item topic="C++ parser" status="done">
+Deal with multiple base elements and accs fields
+that are paired. 
+Only on the types
+        binfo    field_decl function_decl   record_type      var_decl 
+and only makes sense for 
+binfo and record_type. The others are all single instances of accs.
+<br/>
+Can change the way we generate the code in classFuncs
+for specific classes, or alternatively define a sub-class
+and use that by specifying a different entry in the classCreationTable.h file.
+<br/>
+We generated the code differently via createClasses.R.
+</item>
+
+<item topic="C++ parser" status="done">
+Change the name of the accs field to access.
+</item>
+
+<item topic="C++ parser" status="done">
+Convert the access values from priv to private, etc.
+Done in transformString called via internString()
+which has an optional parameter which specifies whether to do this or not
+and it is only true for access/accs fields.
+<br/>
+But need to determine if this is the right place.
+</item>
+
+
+<item topic="C++ parser" status="low">
+Find the reason why when we get the elements from the dynamic table,
+we can have some with a NULL string.
+<br/>
+We now test for this so debug on that and find the node.
+In main.cc.001.tu.
+getBaseNodes(tu[[158]])
+<br/>
+Can't reproduce now, so may be a symptom of a more generic memory issue.
+</item>
+
+<item status="low" topic="C++ parser">
+Clean up the regular expressions and use fewer of them.
+Also think about using the Extract facilities in 
+libpcrecpp so that we can use the same approach as in the
+Perl TU parser.
+</item>
+
+<item topic="C++">
+Fix up getBaseClasses(, TRUE,  TRUE).
+Not giving back values for multiple inheritance properly.
+
+<br/>
+For main.cc.001.tu in inheritance/
+getBaseClasses(tu[[158]], TRUE, recursive = TRUE)
+Getting back just two nodes, but three class names (in the .BaseClassNames attribute).
+</item>
+
+<item topic="C++ parser" status="done">
+Have to deal with elements which are nodes which can have more than one
+entry in a tu record, e.g. "base" in a record_type for the super class information.
+</item>
+
+<item status="done" topic="C++ parser">
+Should we move artificial into its own field rather than being 
+the value of a note? Done in pushEntry.
+</item>
+
+<item topic="C++ parser" status="done">
+Should we make the artificial explicit in the "compiled" class info or use
+a dynamic field in the hash table?
+See C++Parser.xml for the names of the nodes that appear to have an artificial,
+i.e. some of the decl nodes.
+</item>
+
+
+<item topic="C++ parser" status="done">
+Handle the loose/free words, e.g. bitfield that are not
+a field in the node, but just present.
+<br/>
+Example trace.c.0001t.tu node 4540 and its bitfield.
+<br/>
+The native parser is different form the perl one in that 
+it works from beginning of the input consuming strings
+from the front, not replacing in the middle.
+The latter is useful for just leaving the things that didn't
+match for clean up at the end.
+</item>
+
+<item topic="C++ parser" status="done">
+getGlobalVariables() returning the artificial nodes too.
+</item>
+
+<item topic="C++ parser">
+Lower memory usage.
+Since the input line is fixed and we are interning
+the strings, when we consume content from the
+regular expression match, we could use just
+the text within that original buffer and pass it to 
+our internString
+</item>
+
+<item topic="C++ parser">
+Use a pooled table of strings to share the cost.
+We use the R string cache.  Can use pointer equivalences
+then if we intern early.
+<br/>
+Potentially have two pools, one for field names and the other for 
+the code-specific values. The former is likely to remain the same across
+TUs. 
+</item>
+
+<item topic="C++ parser">
+Free the memory.
+If we use the R string interning, we don't have to.
+</item>
+
+<item topic="C++ parser" status="done">
+Not parsing nodes which have a strg: with a :: in the name,
+e.g. wx.cpp.001t.tu and node 136166
+</item>
+
+<item topic="C++ parser" status="done">
+NA's from integer_cst nodes with  -2147483648 as the value for low.
+<br/>
+In createClasses.R and classFuncs.R, do more elaborate test to see
+if we have a real or integer value and then take the real if
+any node of that type yields a real.
+</item>
+</topic>
+
+
+<topic>
+<title>Other</title>
+
+<item topic="C++ parser" status="done">
+Make native parser's lapply() method faster by creating the call
+just once
+and passing it to the C routine and have it insert the element and
+perform the evaluation.
+Seems to speed things up by a factor of 3.
+</item>
+
+
+<item  topic="C++ parser">
+Test the changes made for the native parser with the Perl parser.
+Check the getEnumDeclarationNodes method for the Perl parser.
+</item>
+
+<item  topic="C++ parser">
+Check the methods for the getNodeQualifiers and "access" to make
+certain they return the same thing as the Perl code.
+Also, need  to figure out whether the const, volatile, C, etc.
+qualifiers are notes or regular fields or dynamic fields.
+</item>
+
+<item status="check"  topic="C++ parser">
+The enumerations are dropping values with unql fields that are also enum_decl nodes.
+But then we lose the names so see if we can glue this together.
+Is it happening in the "original" Perl version, i.e. before I made the changes?
+<br/>
+Changed the logic to now use the versions with the unql but to
+look in those that don't have the unql for the node
+that the unql points to  and discard that duplicate.
+E.g. if  DefA points to DefB via the unql, 
+remove DefB by comparing the index of DefA[["unql"]][["INDEX"]]
+to DefB[["INDEX"]].
+</item>
+
+<item topic="C++" status="low">
+Make the filters in getClassNodes, etc. that use checkSource/isSourceFile
+vectorized at the end of the computations to avoid building
+reg.exps or hash tables each time.
+</item>
+
+<item topic="C++ parser" status="done">
+In the operands, setting the node in getNode() causes a crash.
+Look into the std::vector and whether we can insert things directly.
+</item>
+
+<item topic="C++ parser" status="done">
+Issue of names in a node when there are dynamic elements also.
+Added a dynamic argument?
+Could just by pass all the code we have generated and use
+the top-level method for GCCNode and not specialize
+and pretend we know nothing about the fields that
+"commonly" occur.
+<br/>
+This calls getRElement in GCCNode which is virtual and
+so calls the node-specific methods which know about their fields and types
+and then fall through to the dynamic field (hash) table if the element
+being requested is not a regular field.
+One  can also get the elements of the dynamic hash table using
+as(node, "list") or as(node, "character") (the latter flattens the elements
+and handles duplicate entries).
+
+</item>
+
+<item topic="C++ parser" status="done">
+Handle the case that we can't find the file
+in the C++ code.
+</item>
+
+
+<item topic="C++ parser" status="complete">
+Solidify the script that generates the class definitions.
+Moved to inst/TUParser/R/classFuncs.R and others.
+</item>
+
+
+<item topic="Function Pointers" status="done">
+Native declaration.
+</item>
+
+<item topic="Function Pointers" status="done">
+Not out args, just in.
+</item>
+
+<item topic="Function Pointers">
+Where to store the R function pointer if no void *?
+Use the stack mechanism I used in SWIG?
+</item>
+
+<item topic="Function Pointers">
+Update all calls to convertRValue() to provide the Caller attribute if
+specifying a FunctionPointer. (Hack, but ....)
+<br/>
+Should put a context parameter in convertRValue and update the methods.
+</item>
+
+<item topic="Function Pointers">
+Generate the routine to call the R function 
+</item>
+
+<item topic="C++">
+Deal with the operators in computing the signatures and overloading information.
+At least use different names than, e.g., subs
+</item>
+
+<item topic="C++">
+Attempt to deal with case where method and top-leve routine conflict,
+e.g. inst/examples/conflict/
+<br/>
+Can use a strategy of   putting the name of the
+class on the function corresponding to the method,
+e.g. A_foo and leaving the routine as foo
+and then we avoid the conflict.
+This means that the user has to use a$foo() or b$foo()
+or else they have to remember in which  class the
+method was actually defined!!!
+</item>
+
+<item>
+Determine the environment for the makeActiveBinding() for 
+dynamic global variables.
+</item>
+
+<item>
+For dynamic variables, drop the copy if it is a builtin type.
+</item>
+<item>
+For dynamic variables, provide the option to inline the function definitions
+in the makeActiveBinding and so avoid assigning the function to a name.
+This makes sense when we don't need the extra control such as copy,
+e.g. when we are dealing with a builtin type.
+</item>
+
+<item>
+Exercise the typemap code, e.g. with the 2D array of X.
+And/or the linked list.
+</item>
+
+<item topic="struct" status="high">
+When getting a reference to a field, i.e. copy = FALSE,
+do we take the &amp; of the field or not?
+<br/>
+Probably figure this out in createNativeReference() so it
+is used elsewhere.
+getNativeReference() in convertValueToR() is doing it?
+<br/>
+? If it is not a pointer type? or is a primitive type, add it - otherwise don't?
+</item>
+
+<item topic="struct">
+Should we add the copy = TRUE parameter to all [[ methods
+for struct and make the code figure out if it is relevant?
+</item>
+
+<item topic="struct" id="roundtrip" status="done">
+When a struct contains a pointer type as a field,
+round tripping doesn't work.
+See numericVariables and 
+<r:code>
+l2 = new_L2()
+as(as(l2, "L2"), "L2Ptr")
+</r:code>
+The problem is in the R_coerce_L2_L2Ptr code,
+produced by generateStructSetAs() in struct.R.
+Specifically, getCopyFieldCode().
+<br/>
+Also has the double assignment.
+</item>
+
+<item>
+Create an object and a report for what we generate.
+</item>
+
+<item topic="struct" status="efficiency">
+For field get operations in C++ or C structs, go straight to the 
+C routine as there is no need to go through the R function that calls that.
+<br/>
+In fact, we could have an option to do away with these but they do allow 
+the copy parameter. But can do that with [[ rather than $.
+</item>
+
+<item status="efficiency">
+Is a switch faster than the match/pmatch in the field accessors?
+If using pmatch, doesn't matter!
+</item>
+
+
+<item topic="struct">
+In the duplicate methods, handle the finalizer,
+i.e. converting from TRUE/FALSE or a name to
+a native symbol info, etc.
+<br/>
+Where do we carry the default - in each object
+or in a table we generate or by naming convention.
+</item>
+
+<item>
+Generate documentation.
+</item>
+
+<item topic="struct" status="done">
+Recursively defined structs., e.g linked lists.
+<br/>
+See inst/examples/numericVariables/ and #define LINKED_LISTS
+</item>
+
+<item>
+Provide defaults for parameters that are pointers,
+e.g in getrusage
+</item>
+
+<item>
+Should we put the copy parameter on every accessor converter and take references even for 
+basic types?
+</item>
+
+
+<item topic="array" status="high">
+Two and higher dimensional C arrays.
+<br/>
+Also map to matrices in R via the typemap?
+<br/>
+Will want to override the methods for setting the matrix,
+but can use the element accessors to set individual rows.
+</item>
+
+<item topic="array">
+Assignments to subsets of multiway arrays
+<r:code>
+xx = get_xarray2D(copy = FALSE)
+xx[[2,3]]@a = 27L
+xx[2,3]@a = 27L
+</r:code>
+<r:code>
+el = xx[[2,3]]
+el@a = 27L
+xx[[2,3]] = el
+</r:code>
+Check
+<r:expr>array[2:4] = c(10,20,30)</r:expr>
+still works after any changes.
+</item>
+
+<item>
+Check multi-dimensional pointers coerced to arrays in R and the
+computations there.
+<r:code>
+init_FloatPtr(c(2,3,7))
+v = new("floatArrayArrayArray", ref = ref@FloatPtr, length = c(2L, 3L, 7L))
+</r:code>
+</item>
+
+<item status="done">
+init_FloatPtr and the .copy argument.
+The .copy is used but not in the signature.
+</item>
+
+<item>
+Out arguments and arrays.
+init_FloatPtr(c(10L, 20L, 30L))
+returns $sizes with just one entry,
+not the array. 
+Unfortunately, we see it is a pointer type not an array type.
+So we have lost the length at this point.
+</item>
+
+
+<item topic="array">
+Make multi-way arrays like R arrays. 
+Provide x[i, j] methods, apply, and so on.
+Perhaps map them to actual arrays in R when copying.
+Convert to a vector and put the dims attribute on it.
+</item>
+
+<item>
+General support for treating pointer types like an array,
+e.g. FloatPtr
+</item>
+
+<item topic="struct" status="complete">
+In constructor for struct, put the fields as
+named parameters and then assign those that are not missing.
+<br/>
+Put default arguments on them based on the data type.
+</item>
+
+<item topic="array">
+When taking a reference to a subset of a multi-way array, 
+use the  length slot to get the appropriate dimensions for the
+subset.
+</item>
+
+<item topic="array" status='high'>
+Use of type maps to control conversion.
+</item>
+
+<item topic="array">
+Make the tools and class in RAutoGenRunTime  available
+properly so people can create arrays from pointers
+when they know what is really mean from a, e.g. int *
+or double ** and can put diensions on the values.
+<br/>
+We may want to define classes for the basic array types
+eventhough they don't appear in the code we are processing,
+e.g. intArray, etc. and make those available in RAutoGenRunTime.
+<br/>
+Also create routines and provide informatiin in the
+generated code to get the sizeof() the elements
+so can go into an ExternalArrayWithLength object.
+</item>
+
+<item topic="array">
+Allow user to get address of an element, i.e. 
+get a pointer to a part of the array.
+She can then use this to get sub-arrays,
+e.g. something like
+get the 4th element and claim that the array is between
+4 and 14:
+<r:code>
+p = new("intArray", ref = pointer@ref + 4, length = 10)
+</r:code>
+</item>
+
+<item topic="struct" status="done">
+Initialize memory of a struct and its subfields
+<br/>
+calloc() takes care of this.
+</item>
+
+<item>
+Allow a copy parameter to be an integer indicating the level
+and decrement it at each level we copy.
+</item>
+
+<item topic="array" status="medium">
+Allow the caller to specify a routine for copying the elements
+also, i.e. a deep copy/duplicate.
+<br/>
+User can do this themself after the array has been constructed.
+</item>
+
+<item topic="array" status="medium">
+For duplicate, add a finalizer.
+<br/>
+Just free? Or do we want one that will free  the elements also.
+Depends on whether we copied the elements!
+<br/>
+User can do this themself with addFinalizer.
+</item>
+
+<item topic="array" status="check">
+Method for duplicate for array types.
+<br/>
+This is done generically. See R_duplicateArray() and the duplicate method in RAutoGenRunTime.
+We added a field elementSize to ExternalArrayWithLength so we could do this generically.
+</item>
+
+<item status="done" type="struct">
+Conversion from a struct or struct pointer to a struct,
+e.g. 
+for a routine void foo(A a),
+allow the R caller to pass an A or an APtr and do the conversion.
+<br/>
+See Aroutine in inst/examples/numericVariables/.
+<r:code>
+p = new_A(i = 2)
+Aroutine(p)
+bb = new("A", i = 3L)
+Aroutine(bb)
+</r:code>
+</item>
+
+<item topic="array" status="complete">
+Add [&lt;-, [[&lt;- methods for arrays references.
+<br/>
+Figure out how to deal with the issue
+that the elements have to be in a list
+and not a basic vector and that we could get confused by
+assigning    x[1:2] = structure(list(a = 1, b = 2), class = "Bob")
+to an array of class Bob and so would want this replicated.
+</item>
+
+
+
+<item>
+Test unions.
+</item>
+
+<item>
+Test all the primitive types.
+See BuiltinTypeTable and the code in vars.xml in inst/examples/numericVariables/
+</item>
+
+<item topic="array" status="done">
+Method for [ for an array.
+Add to RAutoGenRunTime.
+If these are primitive types, then use [,
+and if complex types, use [[.  But not actually necessary!
+</item>
+
+<item topic="array" status="complete">
+Add start and end arguments to the R functions and R proxy routines
+that copy an array.
+e.g. in get_array in numericVariables.
+<br/>
+The idea is that  we can have
+get_urray(start = 3, end = 8)
+These then get passed on to the C routine and on to the
+actual code that does it.
+<br/>
+Currently in globalVars.R and example is in numericVariables.
+Move that code somewhere more general and do the
+same for the set methods. Have to worry about
+recycling there.
+<br/>
+Also do it for the non-primitive types.
+<br/>
+And see if there is a way to synchronize the
+convertValueToR() code used here and in the method for ArrayType.
+It is small, so okay to repeat!
+</item>
+
+
+<item topic="array" status="low">
+Work out semantics for the class ExternalArraySubset,
+i.e.virtual subsets  of a reference to an array.
+</item>
+
+<item topic="struct">
+Control depth of deep copies with an integer that is decremented.
+</item>
+
+<item topic="struct" status="done">
+When we have a struct, possibly allow the [[ operator
+to be used to fetch a reference, e.g. 
+<r:code>
+ ref[["bob", copy = FALSE]]
+</r:code>
+Can't specify the copy option with ref$bob.
+</item>
+
+<item status="done">
+When setting the value of a dynamic variable
+we want to avoid copying it back to R.
+Just return the value passed to the call.
+E.g. the array in inst/examples/numericVariables/
+Why make the extra copy when we already have the value in R.
+</item>
+
+<item topic="C++">
+Call methods from ancestor classes (not just for derived classes,
+but for regular interfaces).
+<br/>
+e.g. I have a class B with a method foo() and I want to call
+A's foo() method where B extends A.
+<br/>
+We have a method for A. So if we were to add a parameter to the
+R function and corresponding C++ wrapper routine to specify 
+the class of the method we actually we want to invoke,
+we could default to that in B, but allow the user to specify
+.inherited = "A" and 
+</item>
+
+<item>
+Fill in the IntegerTypeClassMap and define new built-in types
+for the additional basic types.
+</item>
+
+<item>
+Fill in the getRTypeName methods since they are being used
+in the derived class method types.
+</item>
+
+<item>
+Deal with static global variables
+<br/>
+E.g. see MainString in Classes.h or any example.
+<br/>
+generateStaticClassVariableCode looks to have been
+split out and not tidied up and
+was adding its results to another structure.
+So make certain they are collected and used in writeCode.
+</item>
+
+<item topic="C++" status="done">
+Write a function to identify the multiple inheritance 
+ambiguity. See inst/examples/inheritance/Classes.h
+for an example, specifically C::p(bool) and the workaround
+in make.xml.
+<br/>
+See page 392-393 of Stroustrup.
+"Overload resolution is not aplied across different class scopes".
+<br/>
+Also, the use of "using" (p393) doesn't work as we are
+explicitly calling by class name, e.g.
+  C::p(b)
+and not by direct inheritance and C doesn't have the "using" declaration.
+If it does, all works just fine.
+<br/>
+See S4dispatch.R for findMIAmbiguities() and derivedClass.R where this is used.
+</item>
+
+<item topic="C++">
+Better way to use a string to represent a method
+to identify whether it is static or not.
+In other words, use an object that contains
+this informatin as a field.
+<br/>
+We are gradually moving to objects to represent
+the generated code.
+<br/>
+These should be integrated with the 
+objects to represent the code coming out of the
+resolved types but just have the extra content which is the code!
+Parallel structure is there for R code objects, e.g. methods, ...
+<br/>
+See ResolvedNativeClassMethodDeclaration  in show.R
+</item>
+
+<item>
+raiseRError() needs to raise the error!
+See shapes.xml for an example.
+</item>
+
+<item topic="C++ Derived" status="done">
+Derived class code is losing the methods.
+Do we mean the names?
+<br/>
+If so, fixed by adding the names back to the methods
+after we do some filtering.
+</item>
+
+<item topic="documentation">
+Document the way we compute the longest common substring for enumerations.
+</item>
+
+<item topic="C++ Derived" status="later">
+Consider more sophisticated protected barrier mechanism,
+e.g. with a dynamic value.
+</item>
+
+<item topic="C++ Derived" status="done">
+Put in the protected barrier mechanism.
+See the RQt/src/ code for what this is.
+</item>
+
+<item status="low">
+Output to the generated code the current set of TUOptions in effect when code
+was generated so that people can figure out what the interface is!
+</item>
+
+<item status="complete" topic="C++ Derived">
+Names of new, derived classes need to take RClassName into account.
+<br/>
+Partially done.
+</item>
+
+<item status="done">
+Added TUOptions() and friends
+</item>
+
+<item>
+Be more forgiving about int parameters and allow numeric values
+that we convert and validate being not NAs.
+</item>
+
+<item>
+Arrays as fields in C++ classes
+<br/>
+See Copy in Classes.h
+<br/>
+Firstly, if the accessor method is declared const, then we get an error
+as we are returning to an int *, so we need to declare that as const also,
+i.e.
+<c:code>
+const int * __R_data_get () const { return( data );}
+</c:code>
+When assigning a field, we want to copy the contents,
+not set the pointer.
+</item>
+
+<item>
+Investigate convertRValue for ArrayType further
+with more interesting types.
+</item>
+
+<item topic="performance">
+For the parameters in method where we know the type
+based on the S4 dispatch, we can discard the coercion,
+e.g.  in Classes.h
+<r:code><![CDATA[
+setMethod( 'subs' , c( 'Copy', 'integer' ),  	 
+function( this , i , .inherited , ...  )
+{
+      this = asReference( this ,  "Copy" )
+      i = as( i , 'integer')
+ 
+     .Call('R_Copy_subs_p1Copy_int', this, i)
+} )
+]]></r:code>
+we don't need the as(i, 'integer') since i is known to be an integer.
+<br/>
+This is a poor example as we want to allow the i to be a numeric,
+but the general idea is correct.
+ </item>
+
+<item status="low">
+Potentially allow the C++ derived method functions ignore the this.
+See example in make.xml for RCopy where we don't need it.
+</item>
+
+<item topic="C++ Derived">
+Create functions for checking the correct number of parameters necessary
+in each R function being used as a method.
+</item>
+
+<item topic="C++" status="complete">
+Dealing with C++ReferenceType.
+<br/>
+Declaration of local variables from R objects should be a pointer to that type.
+Then when referring to them, use *val. (Looks like we are doing something along these lines
+in createNativeCode in bindings.R)
+<br/>
+Need to do this in field setting methods, e.g. x[[bob]] = val, althought
+not obvious this is a good idea giving a reference to a potentially transient object.
+<br/>
+Otherwise, if we use regular declaration, e.g. Copy &amp;a, we have to initialize the value 
+in that expression. So we have to do the two steps in one.
+<br/>
+But we have to be careful about this as we want the getNativeDeclaration() to work
+fine for the parameter declarations but to be different for local variable declarations!
+So we need the context or have to do it conditionally.
+</item>
+
+<item topic="C++" status="done">
+Access to operators work. 
+The function in R is the name of the operator translated to its 
+english word form, e.g. assign, subs, etc.
+See OperatorNames in getMethodNames.R
+</item>
+
+<item topic="C++ Derived" status="done">
+Overriding operators works. See make.xml in inheritance
+for the example regarding RCopy.
+</item>
+
+<item topic="C++" status="done">
+Added constructorNamePrefix for TUOptions
+so that we can change the name of all constructors
+when they are locate via getClassMethods.
+This is to avoid conflicts with existing function names,
+e.g. C for a class and the function C.
+</item>
+
+<item topic="C++ Derived">
+Names of the parameters in some of the methods, e.q. paintEvent() 
+are not regular names but, e.g.,  u203364.
+<br/>
+Turns out this is a bogus parameter
+and the RGCCTU... package deems it an unused parameter!
+It is declared as     virtual void paintEvent(QPaintEvent *);
+<br/>
+(See QtTU.xml in RQt/inst/TU/)
+<r:code>
+tu = p = parseTU("qpushbutton.cc.001t.tu")
+classNodes = k = getClassNodes(p)
+m = getClassMethods(k[["QWidget"]])
+class(m$paintEvent$parameters[[2]])
+</r:code>
+</item>
+
+<item topic="C++ Derived" status="check">
+Allow for a new class rather RDerivedClass to be used as the base
+extending class, e.g
+RQDerivedClass.
+<br/>
+Works for the native code.
+<br/>
+Need to specify the R class name for the derived class.
+Perhaps make it a vector of length two with names
+native and r (to make writeCode).
+</item>
+<item topic="C++ Derived" status="low">
+If the user specifies a different class than RDerivedClass
+as one of the bases for the derived classes we generate, we 
+also need to control whether we generate the getMethodNames, getMethodTypes,
+etc.   These are very tied to the C++ RDerivedClass class.
+If somebody extends that, then no problem. However, if somebody 
+comes in with something from a different class hierarchy, then we will generate
+methods that don't make sense.
+But then they can take over the code generation by just reorganizing
+the computations and leaving some out.
+</item>
+
+<item topic="C++ Derived">
+Allow filter for method names for derived classes,
+e.g. for qt_metacall which we might handle in our newly
+specified native derived class.
+</item>
+
+
+<item topic="C++ Derived">
+In the derived class code for QPushButton
+(see QtTU.xml),
+qt_metacall has an extra , at the end of the declaration of the signature.
+<br/>
+getNativeDeclaration returns "", and so a pointer to a void
+which embeds the * in the name and then passes onto the getNativeDeclaration() for void
+ends up returning an empty string.
+<br/>
+Check it doesn't break anything else, e.g. 
+foo(void).
+<br/>
+If it does, move the handling of this case to the PointerType method
+and check if the pointer type is a VoidType.
+</item>
+
+<item status="done">
+Added a "TU" field to each GCC::Node in Perl so that we can get back to
+the entire chain of nodes.
+<br/>
+The idea is that we can the use a node to get another node.
+However, this blows the C stack.
+It is probably a case where we end up explicitly converting
+a node which tries to explicitly convert the TU element which 
+in turn tries to convert each of the nodes and gets into infinite recursion.
+It is happening in getValue() as part of getParameters() so trying
+to narrow it down.
+<br/>
+Was in aggr_init_expr with the "fn" element.
+</item>
+
+<item status="done">
+Put a converter for RSPerl on the GCC::Node elements.
+Would avoid all the convert = FALSE...
+</item>
+
+<item status="low">
+Implement the RSPerl converter for GCC::Node elements
+in C code
+<br/>
+Need to be able to link against some of the utilities in
+RSPerl.
+</item>
+
+<item topic="Qt" status="question">
+Do we want to override QObject::metaObject()? qt_metacall?
+</item>
+
+<item topic="C++ Derived" status="done">
+Deal with inheritance in the base class when creating 
+the derived class.
+For example, if we have B extends A and 
+we have methods B::b() and A::a(),
+then we want to be able to create class RB
+and be able to set methods for b() and a().
+<br/>
+No problem, we just flatten the list of methods.
+</item>
+
+
+
+<item topic="c++" status="check">
+Can't call getClassMethods on the resolved class.
+
+<br/>
+In the RQt context
+<r:code><![CDATA[
+qstack = resolveType(classNodes[["QStack<T>"]], tu)
+m.qstack = getClassMethods(qstack)
+]]></r:code>
+fails.
+<br/>
+Need the resolved type to have the index and then can get back to doing
+the same thing.
+<br/>
+Also, resolveType() can be instructed to get the methods? Don't think so.
+But recall something about not handling the fields or methods or something
+to avoid expense.
+</item>
+
+<item topic="C++" status="done">
+How can we force certain classes into the TU output?
+<br/>
+Create a global variable which is  a pointer to that class, e.g.
+<pre>
+QStackedWidget *w;
+</pre>
+<br/>
+See R/RQt/inst/TU/qstackedwidget.cc and the
+resulting  TU still doesn't have the QStackedWidget in it.
+</item>
+
+<item topic="C++" status="complete">
+The methods are now resolved with names that
+include the class,  e.g. 
+<r:code>
+m = getClassMethods(classNodes[["QDropEvent"]])
+names(m)
+</r:code>
+So specify getNodeName(, addPrefix = FALSE)
+in getClassMethods, or
+for nodeIterator generally, or make it an
+argument.
+<br/>
+Added an addPrefix parameter to nodeIterator.
+</item>
+
+<item topic="C++" status="complete">
+For enumerations (and other types),
+get the namespace in which they are defined.
+e.g. QVariant::Type.
+<br/>
+Aren't we doing this now? Yes. See 
+RQt/inst/TU/test.R and the enumeration computations there.
+<r:code>
+ grep("QVariant::Type", names(qt.enum.defs), val = TRUE)
+</r:code>
+</item>
+
+<item>
+Allow finding definitions by specifying
+the namespace and the name of the element,
+e.g. 
+ QVariant, Type.
+<br/>
+So should be able to do
+getEnumerations(c("QVariant", "Type"), tu)
+getEnumerations(c("Qt", "CursorShape"), tu)
+</item>
+
+<item status="done" topic="C++">
+Put the namespace prefix on the names of the enumerations.
+</item>
+
+<item topic="C++" status="complete">
+Put the namespace prefix on the names of other types,
+not just enumerations.
+</item>
+
+
+
+
+<item>
+Do we use the C routines for converting enum values?
+<br/>
+These are just for converting raw C-level values.
+It would be easy to create a wrapper that could be called from
+R and then by-pass the asEnumValue.
+</item>
+
+<item topic="C++">
+When a default value for a parameter is from a private
+enum or private variable, deal with this
+<br/>
+i.e. put the value in the definition.
+Could hide it in the body rather than leave it in the formals.
+But it is fine as a regular default value.
+<br/>
+e.g. QtGui/qinputdialog.h. ?
+</item>
+
+<item topic="C++ Derived" status="low">
+Cast object to RDerivedClass in C++ code, e.g. to call R_getMethods.
+<br/>
+i.e. use the single point in RDerivedClass to do this, but it is not
+clear that we can given the multiple inheritance.
+<br/>
+The penalty of not being able to do this is some extra
+methods in the C++ code we generate. It is not an enormous problem!
+</item>
+
+<item topic="C++" status="done">
+Access to fields that are shadowed by sub-classes.
+<br/>
+See class C in inst/examples/Shapes/shapes.h (and the XML file)
+<br/>
+See make.xml and c[["b"]] and c[["B::b"]].
+</item>
+
+<item topic="C++" status="low">
+Allow the creator to decide to use S4 methods for all 
+C/C++ functions/methods regardless of whether they are overloaded or not.
+<br/>
+But how would this be used? only from R,
+as any existing C++ code will not invoke that method
+but only the on in the vtable. So this doesn't make any sense?
+<br/>
+See override_virtual.cc
+</item>
+
+<item topic="C++ Derived" status="done">
+Remove the virtual methods from the descendant classes
+when generating the methods for the regular classes.
+<br/>
+Do we need them for the derived classes?
+They are fine after filtering for interface
+and derived generation.  See inst/examples/inheritance/
+<br/>
+The function is filterInheritedVirtualMethods().
+</item>
+
+
+<item status="done">
+<issue>
+Are the conversions including the text name  correctly?
+<br/>
+In RQt
+<r:code>
+as(1L, "Qt::Orientation")
+</r:code>
+<br/>
+For some reason, seem to need the method for integer.
+</issue>
+</item>
+
+<item status="error">
+<r:code>
+m = getClassMethods(k[["QMetaMethod"]])
+qmeta.methods = resolveType(m, tu)
+</r:code>
+</item>
+
+<item>
+PendingType for expandingDirections in QSizePolicy.
+
+<r:code>
+library(RGCCTranslationUnit)
+tu = p = parseTU("qpushbutton.cc.001t.tu")
+
+k = getClassNodes(p)
+m = getClassMethods(k[["QSizePolicy"]])
+resolveType(m[[16]], tu)
+</r:code>
+</item>
+
+<item status="done">
+Integers as names of methods.
+<r:code>
+m = getClassMethods(k[["QSizePolicy"]])
+</r:code>
+These are operators such as operator()== or !=
+and operator QVariant() const. 
+See QtGui/qsizepolicy.h
+<br/>
+getClassMethods() now has a dropOperators argument.
+</item>
+
+<item status="done" topic="tu parser">
+How do we find the names/types of the operators?
+<br/>
+It seems that it follows the operator word. 
+That would mean we have to fix the getClassMethods to 
+look for operator in the names of the node and/or 
+operator as the value of the field "note".
+<br/>
+We need to fix the parser.
+<br/>
+Parser is now "fixed" to do this.
+<pre>
+@61766  function_decl    name: @1525    type: @63230   scpe: @31984  
+                         srcp: qicon.h:74              chan: @63231  
+                         note: operator assign         note: member  
+                         accs: pub      args: @63232   body: undefined 
+                         link: extern  
+</pre>
+</item>
+
+
+<item status="check">
+Suppress these messages:
+ignoring flds node (13803) for QMetaMethod where type is GCC::Node::const_decl when resolving record_type
+<r:code>
+qmeta.methods = resolveType(m, tu)
+m = getClassMethods(k[["QMetaMethod"]])
+</r:code>
+These are probably elements of the enums.
+</item>
+
+
+<item topic="C++">
+Filter out protected enums.
+enumeral_type nodes  don't seem to have an access field.
+</item>
+
+<item>
+Put the addToNamespace in RQt/inst/TU/test.R into this package.
+<br/>
+And make more general and bullet-proof.
+</item>
+
+<item>
+Enumerations such as QVariant::Type need a real,
+not an integer as the LastType wraps around to -1.
+</item>
+
+<item topic="C++" status="check">
+writeCode(, "native") for an enumeration (or any type with a namespace)
+needs to create the name as, e.g. Qt::FocusPolicy
+rather than Qt_FocusPolicyValues
+<br/>
+Check the regular enumerations also.
+And the different types of enumerations, e.g. Bitwise, ...
+</item>
+
+<item topic="C++" status="check">
+writeCode(, "native") for an enumeration (or any type with a namespace)
+creates garbage because it treates the
+vector of namespace and type name via paste
+and ends up with two routines.
+
+E.g. in qpushbutton.cc.001t.tu
+<r:code>
+focus = resolveType(tu[["57065"]], tu)
+writeCode(focus, "native")
+</r:code>
+</item>
+
+<item>
+In resolveType, be able to identify types that we "know" and can be
+left as is, i.e.  that we can do by hand, e.g. QHash, QVector, and so
+on.  The aim is to avoid going down very deep on classes that we don't
+really care about in the automated code generation.
+</item>
+
+<item topic="wxWidgets">
+Compile the C++ code from wx.R
+</item>
+
+<item>
+When register a PendingType, if there is an interruption or
+error, make certain to clear the PendingType, i.e. use an on.exit().
+</item>
+
+<item status="done">
+coerceRValue causing a mess for Enumerations.
+<br/>
+Make certain to paste the output of dput across multiple lines
+in coerceRToEnumeration.
+</item>
+
+<item topic='C++' status='done'>
+In the wx.R file, get error on wxFontDialog:
+<pre>
+[1] "wxFontDialog"
+Error in as(t, "CString") : 
+  no method or default for coercing "PointerType" to "CString"
+</pre>
+</item>
+
+<item topic="C++" status="done">
+Protect against next as an argument which is a reserved word in R.
+<br/>
+see wxWizardPageSimple and its Create() method.
+</item>
+
+<item topic="C++">
+SetValue in wxSpinCtrl has different parameters than the previous definition of 
+SetValue.
+Same for Enable in wxMenuBarBase.R
+<br/>
+Would this disappear if we knew the SetValue was generic across classes?
+</item>
+
+<item topic="C++" status="done">
+new_long int() in wxComboBox.R in GetSelection()
+<br/>
+See getRConstructorFunctionName in struct.R.
+Now a generic.
+</item>
+
+<item topic="run-time">
+Get the c() method for Bitwise out of the general environment
+as it is being used in general for c(1, 2, 3).
+</item>
+<item topic="run-time">
+Add new_long_int()  and friends to  RAutoGenRunTime.
+</item>
+
+<item topic="run-time">
+Get rid of the warning messages when RAutoGenRunTime is loaded.
+Is this the setClassUnion()? And if so, why is it doing things with 
+double? Is this an R issue?
+</item>
+
+<item status="done" topic="C++">
+ Static method in, e.g. wxMessageDialog::wxCreateObject, gets an NA as the first(?) argument.
+ It doesn't seem to be identified as static in the TU, but is in our representation.
+<br/>
+ Fixed in createNativeBinding
+</item>
+
+
+<item status="done">
+Why does getEnumerations() for fann return two fann_errno_enum objects.
+They are different nodes (2368 and 5699)
+<pre>
+names(enums[[4]])
+ [1] "prec"     "min"      "position" "max"      "name"     "size"     "INDEX"    "csts"    
+ [9] "algn"     "sign"    
+names(enums[[13]])
+ [1] "prec"     "min"      "position" "max"      "name"     "size"     "INDEX"    "const"   
+ [9] "csts"     "unql"     "algn"     "sign"    
+</pre>
+There is an unql in the second one  that points to the first and this second one has
+the const qualifier.
+<p>
+We can favor the unql (unqualified) version.
+This drops  _LIB_VERSION_TYPE in favor of the anonymous version
+named 3106.  But that is because _LIB_VERSION_TYPE is in fact
+a typedef  of the form
+<pre>
+typedef enum {
+
+} _LIB_VERSION_TYPE
+</pre>
+So it seems correct to ignore it, if not necessarily as convenient.
+</p>
+</item>
+
+<item>
+What about ... arguments in routines, e.g. fann_create_standard.
+<p>
+Don't seem to get these.
+</p>
+</item>
+
+<item status="done">
+Enum type names.
+<p>
+When print fann.ds, we get an NA for the errno_f.
+It is an enum fann_errno_enum and there is no typedef.
+So we should have the local name for the enum.
+We seem to have lost the name on the EnumerationDefinition.
+</p>
+</item>
+
+<item>
+Introduce a new EnumValue class that allows for larger values, e.g. the -213... or whatever
+that arose in another problem.
+</item>
+
+<item status="done">
+Why does getGlobalVariables(fann.tu) not find the 
+FANN_TRAIN_NAMES, etc? They are in the TU file
+but perhaps not found when we loop over chain.
+We may need to do an exhaustive search over all nodes
+and figure out if they are the top-level scope.
+</item>
+
+<item topic="C++ Derived" status="done">
+in createDerivedClass, the wrong base class is used - it should be the 
+one given as the class we are extending, not its superclasses.
+<br/>
+Example, please? 
+<pre>
+shapes = parseTU("shapes.cc.001t.tu")
+klass  = createDerivedClass(c(RCircle ="Circle"), shapes)
+klass
+</pre>
+Looks to be doing the right thing. 
+</item>
+
+<item topic="C++ Derived" status="low">
+The name of the R class could be made easier to specify, perhaps, but not really.
+<br/>
+Make it work for vectorized calls.
+<br/>
+At least easier to specify
+</item>
+
+<item topic="C++ Derived" status="done">
+Don't generate _setRMethods if there are no accessible fields.
+</item>
+
+<item topic="C++ Derived" status="done">
+What's the NA for in the rsetMethodsFunction.
+<br/>
+These have been removed from the derived class structure.
+</item>
+
+
+
+<item topic="C++ Derived" status="done">
+In createDerivedClass, if there are no virtual methods, bail out and
+return NULL.
+<br/>
+See 
+<p>
+Although, leave an option to generate the code so that
+somebody can use the gnerator to create the basics and then
+add a virtual method by hand.
+<br/>
+return(NULL) if virtualOnly and no methods.
+</p>
+</item>
+
+<item status="done">
+Second time we do
+<r:code>
+a = createClassBindings(classNodes[["A"]], tu)
+</r:code>
+in ABC-tu.R, we get an error that is being caused by mis-resolving things.
+
+Registering the resolved node before the end of the function and computations
+were still being done afterwards.
+</item>
+
+<item status="low">
+Would like to allow a call of the form
+  B(10)
+to coerce the 10 to an integer but to warn
+or throw an error when 10.5 is used because the value
+is not actually an integer.
+So we would define the method for a numeric, but coerce
+to an integer.
+<pre>
+tu = parseTU("int.c.001t.tu")
+iface = generateInterface(tu, "foo", files = "int")
+</pre>
+<p>
+The coercion is done, current using as(x, "integer")
+which does not warn.
+</p>
+
+<example>
+Use a typemap entry.
+</example>
+</item>
+
+<item topic="C++" status="improve">
+For fields in C++ classes, resolveType needs to include information
+about the access of each field, i.e. public, protected or private.  At
+present, we just get a list of the types and the names of the elements
+are the names of the variables. But we need to extend the type with an
+accessor.  We could use the qualifier slot, but this seems like a bad
+idea.  Perhaps we should use an explicit field class that contains the
+type and the name and could then be extended to support C++
+attributes.  What else would we have to change?
+
+<br/>
+For the moment, just tag the accessor on as an attribute of the
+resolve type.
+</item>
+
+<item topic="C++" status="check">
+Access to global variables within classes, i.e. static class variables.
+See var_decl within a record_type. See the note <xref linkend="record_type">below</xref>
+on following record_type.
+<br/>
+We detect the var_decl in the fields and need to treat it differently
+than a regular field.
+We can recognize it is static by it being a var_decl in a list of fields,
+or alternatively we can look at the scope and see it is within a record_type node.
+<br/>
+<check>
+Need to make certain the R function is assigned to a name.
+</check>
+</item>
+
+ <item topic="C++" status="check">
+ Check that we handle field accessors for public fields? 
+ And then implement the protected field mechanism for derived classes.
+ <br/>
+Want to use a [[ operator as we can have overlap with method
+names.
+<br/>
+See 
+<pre>
+tu = parseTU("inst/examples/classFields.cpp.001t.tu")
+k = getClassNodes(tu)
+b = createClassBindings(k[[1]], tu, "A")
+</pre>
+No access to (any) fields at this point.
+Need to use createRFieldAccessors() (as in generateStructInterface()).
+
+<br/>
+getFields works at the TU level, returning TU nodes.
+resolveType() works in R-level descriptions and loses 
+the access information.
+<pre>
+ff = getFields(k[[1]])
+ff = getFields(k[[1]], c("public", "protected", "private"))
+resolveType(k[[1]])
+</pre>
+</item>
+
+<item topic="C++">
+getClassNodes() giving nothing for shapes.cc.001t.tu.
+<br/>
+For g++ 4.1.0  (as opposed to 4.2.1), we do get the desired result.
+<br/>
+We get the desired result from 4.2.1 if we remove the
+<pre>
+using namespace std;
+</pre>
+at the top of shapes.h.  We can move that line to shapes.cc or we can
+replace it by qualifying all references to cout and endl with std::.
+We macro-ize this (STD_NS) and so we can turn it on and off (via a
+command line flag -DSTD_NS=) and then we can test the output with it
+on and off.  And then we see that the presence of the std:: namespace
+at all causes the classes not to be emitted.
+</item>
+
+<item topic="C++" status="done">
+Provide a names method for C++ objects? And structs?
+</item>
+
+<item topic="C++ Derived" status="easy">
+Why not allow a vector for the className argument in createDerivedClass
+act as super-classes and not a vectorized creation of separate calls.
+</item>
+
+<item topic="C++" status="reflection">
+a function for reflecting the fields of a C++ class/struct
+that returns information about private and protected
+fields (and their types).
+<br/>
+Similarly, a methods function for finding the available methods.
+This could use the resolved methods but then would need the code 
+to be available to the run-time system.
+<br/>
+For a struct, we have the equivalent R class. For a C++ class, we do not.
+</item>
+
+<item topic="C++" status="done">
+Get the name of the R class corresponding to the C++ class right,
+i.e.  APtr not A? See createClassBindings.
+<br/>
+This is when we are accessing the fields in the class and need to set methods
+for the relevant R class.
+</item>
+
+
+ <item topic="C++ Derived">
+ <issue>Need to deal with fields that are overloaded in multiple inheritance
+for derived classes, i.e. identify to which class' field we are referring.
+ </issue>
+ </item>
+
+<item topic="C++" status="high">
+ <issue>Make the $ method for the classes
+   know the available methods when they are constructed
+   and look there rather than dynamically.
+ <br/>
+ C++ classes and methods are more complex than structs because of inheritance.
+  <br/>
+   Need to create a setMethod("$", "class")
+   for each class with a call to NextMethod() if name is not
+   in the local version.  But then we can avoid the problems
+   associated with the dynamic class information being wrong,
+   e.g.  missing wxControlWithItems.
+ </issue>
+</item>
+
+<item topic="C++" status="done">
+  Only access the public fields in a C++ class.
+<pre>
+tu = parseTU("inst/examples/classFields.cpp.001t.tu")
+k = getClassNodes(tu)
+b = createClassBindings(k[[1]], tu, "A")
+</pre>
+</item>
+ 
+<item topic="C++ Derived" status="later">
+  Give special access to the protected methods.
+This is so that they cannot be seen by regular users.
+But this is a problem with S4 as they are not protectable there
+but still visable.
+We would need to implement our own dispatch mechanism which is not out of the question!
+<br/>
+  Perhaps put them in an environment?  But need to use method dispatch.
+</item>
+
+
+
+<item status="done">
+C++ Methods have the This as an instance of the class not as a pointer to it.
+And then they try to interpret the argument as a pointer.
+<fix>
+Mark the first argument in a method as being an in argument and not an inout
+and then all is well. See how this impacts static class methods! It's okay!
+</fix>
+</item>
+
+<item status="done">
+Static methods
+</item>
+
+
+<item topic="C++" status="low">
+Find which versions of g++ give us all the classes and which give only those that are refernced.</item>
+
+<item topic="C++" status="low">
+<issue>getClassNodes() when dealing with output from g++ 4.*
+Is this about the fact that we don't see all of them, only those
+that are referenced in the code?
+</issue>
+</item>
+
+
+<item status="done">[Done]
+In ABC.cpp, 
+aa = createClassBindings(classNodes[["A"]], tu)
+fails with a no slot of name ancestorClases.
+</item>
+
+
+<item status="done">
+<issue status="done">
+ Constructor function in R is defined as a generic with no arguments.
+<br/>
+See ReservedWords in bindings.R to add more.
+</issue>
+</item>
+
+<item topic="C++" status="done">
+ <issue>
+ For C++ methods, why do we have a default value for this as new_ClassName()
+If we do, we should check to see if that argument is missing and return
+the value.
+<br/>
+We don't have such a default value.
+ </issue>
+</item>
+
+<item status="done">
+<issue>
+From the TU for inst/Example/globaRef.c, we generate a wrapper for foo 
+which has a reference to R_copyStruct_int. Why?
+
+<pre id="duncan" popup="true"><![CDATA[
+#ifdef __cplusplus
+extern "C"
+#endif
+SEXP
+R_foo(SEXP r_x, SEXP r__copy, SEXP r_resultLength)
+{
+	
+		SEXP r_ans = R_NilValue;
+		SEXP r_names = R_NilValue;
+		int r_ctr = 0;
+		int x, *_p_x = &x;
+		
+	
+		if(GET_LENGTH( r_x ) > 0) {
+			if(IS_S4_INSTANCE(r_x, "intPtr")) 
+				_p_x = R_getNativeReference(r_x, "int", "intPtr");
+			else
+				_p_x  =  INTEGER ( r_x ) ;
+		}
+	
+		 foo ( _p_x );
+		 PROTECT(r_ans = NEW_LIST( INTEGER(r_resultLength)[0]));
+	 PROTECT(r_names = NEW_CHARACTER( INTEGER(r_resultLength)[0]));
+	 if( LOGICAL(r__copy)[ 0 ]  != NA_LOGICAL) {
+	 	 if( LOGICAL(r__copy)[ 0 ]  == FALSE && GET_LENGTH( r_x ) == 0) {
+	 	 	 PROBLEM "ignoring request to not copy argument x as only local/stack value is available"
+	 	 	 WARN;
+	 	 }
+	 	 SET_VECTOR_ELT( r_ans, r_ctr, LOGICAL(r__copy)[ 0 ] == FALSE && GET_LENGTH( r_x ) > 0 ?  r_x : R_copyStruct_int( _p_x ) );
+	 	SET_STRING_ELT( r_names, r_ctr++, mkChar("x"));
+	 }
+	 
+	 SET_NAMES(r_ans, r_names);
+	 UNPROTECT(2);
+	
+		 return(r_ans);
+}
+]]></pre>
+
+</issue>
+
+</item>
+
+<item status="done">
+Get the language recognition correct so that it sees a .c$ or .c\.
+extension and uses that to indicate C code.
+</item>
+
+<item status="done">
+generateInterface: subsetting vars$vars with names of global variables
+But vars$vars is made up of set, get, raccesso, rbinding, registration
+not variable names.
+</item>
+
+<item status="done">
+ [This is related to the one above]
+ Where does the code for the global variables go in generateInterface?
+</item>
+
+ <item status="done">
+  need writeCode to recognize the global variables and emit code for that.
+<br/>
+  Put a class on the result of generateInterface.  NativeInterfaceCode.
+ This is in the correct form for writeCode () and can be passed directly.
+  We have added a method for this that just treats it as a list.
+ </item>
+
+
+<item status="done">
+This fails.
+<pre>
+tu = parseTU("globals/globals.c.001t.tu")
+x = generateInterface(tu, files = "globals.c")
+</pre>
+</item>
+
+
+<item status="need-example"><issue>const const appearing</issue></item>
+
+<item status="later"><issue>builtin typmap and corresponding types at C, R, alloc, etc. levels. make more structured and abstract.</issue></item>
+
+<item>
+Fill in the R and C routines for complex type. (Complex numbers or non-primitive data type?).
+<issue>
+</issue>
+</item>
+
+<item topic="C++" status="done"><issue>getClassNodes needs the basename of the file with no extension.
+  Handle this automatically.
+ We could use a different argument for validateSource, i.e. checkSource
+  and give it a list of possible values, i.e. %in% c(foo, foo.cc, foo.cpp, foo.h, ...)
+<br/>
+Uses checkSource()
+  </issue></item>
+
+<item status="done"><issue>writeCode() for NativeRegistrationInfo in example for gatherRegistrationInfo seems to have the wrong structure
+  when writing the namespace.  Has the information already been turned into code.</issue></item>
+
+ <item status="done"><issue>getValue() methods for bit_ior_expr, etc. </issue></item>
+
+
+<item topic="C++" status="done">
+getClassNodes() for classVars.cpp.001t.tu
+<br/>
+Is it just that there is a single value? Yes
+</item>
+
+<item topic="body computations" status="low">
+getInOutArgs(wx[[56941]]) fails becase refersTo has no method for GCC::Node::scope_ref
+</item>
+
+
+ <item topic="C++">getValue() method in findDecl.R for scope_ref
+<br/>
+  Some scope_ref nodes have no attributes in the TU.
+<br/>
+See shapes.cc.001t.tu and 
+<pre>
+getValue(tu[[63929]])
+</pre>
+This corresponds to line 899 in /usr/local/include/c++/4.2.1/bits/istream.tcc:
+<pre>
+!__ct.is(ctype_base::space, _Traits::to_char_type(__c))
+</pre>
+And node tu[[63755]] for the condition in the while() statement.
+
+Some scope_ref have a @type attribute.
+ </item>
+
+ <item status="low">Make getValue() return symbolic expressions by adding an optional argument,
+  e.g. in  bitOp.cpp, want a | b rather than 3 | 7.
+  This eagerness to evaluate is because  of VariableDeclaration and we use this in computeGlobalConstants.
+  So we want to be able to control this with an extra argument.
+ </item>
+
+ <item status="low">Implement the computeGlobalConstants for symbolic  and not symbolic.</item>
+
+ <item status="done"><issue>Merge getInitValue() with getValue ? Yes. Same  idea.</issue></item>
+
+ <item topic="C++" status="done">
+ Chase down why resolveType() for a C++ class definition comes back as a ResolvedTypeReference and not a C++ClassDefinition.
+resolveType.GCC::Node::type_decl seems to do the right thing.
+<br/>
+<pre>
+wx  = parseTU("~/Projects/org/omegahat/R/RwxWidgets/autoGenerate/wx.cpp.001t.tu")
+classes = getClassNodes(wx)
+x = resolveType(classes[["wxGenericDirDialog"]], wx)
+class(x)
+</pre>
+ </item>
+
+  <item><issue>check if gatherRegistrationInfo works and can be used with writeCode. In the example so hopefully
+     works. </issue>
+  <br/>
+  generateInterface() collects the information from the results.
+  </item>
+<item>
+ <issue> Generate a list of all the functions/methods that we have generated
+and group them by class, by name, etc. and use this as a form of dynamic help
+(and in the registration).
+<br/>
+Is some of this already done for the registration
+ </issue>
+</item>
+
+
+<item status="done">
+<issue>
+  computeGlobalConstants:  need to look at the element type of the array
+to see whether it is constant.
+ See fann_data.h and fann.c.001.tu and FANN_TRAIN_NAMES
+<pre popup="true" id="computeGlobalConstants"><![CDATA[
+tu = parseTU("fann.c.001t.tu")
+z = getGlobalVariables(tu)
+z[[1]]
+names(z[[1]][["type", convert = FALSE]][["elts"]])
+]]></pre>
+</issue>
+ </item>
+
+<item status="done"><issue>Why load Combinations when calling computeGlobalConstants()</issue>
+   <p>Seems to be in findBitwiseFunctionOf</p>
+</item>
+
+
+<item status="check">
+This seems okay but I don't have a good example.
+<issue>names() doesn't work. 
+<br/>
+This happens after we load Combinations. So find out why
+findBitwiseFunctionOf is being called and
+fix Combinations.
+</issue>
+ </item>
+
+
+<item status="done"><issue>Eradicate the message about
+"linker input file unused because linking not done" in call to getCppDefines().</issue>
+</item>
+
+
+<item status="check"><issue>NAs from enums (e.g. wctype.h:85) when we get --2147483648 for _ISwgraph.</issue>
+<pre>
+tu = parseTU("wctype.cpp.001t.tu")
+e = getEnumerations(tu)
+resolveType(e, tu)
+</pre>
+<p>
+Have to change the slot in EnumerationDefinition to "numeric" rather than "integer".
+<question>We may want two classes of EnumerationDefinition, and then so too
+BitwiseEnumerationDefinition.
+</question>
+</p>
+<p>
+The problem is that enumerations can be unsigned integers, but R can't handle that
+so we need a numeric. How does this affect other parts of the code, e.g. the run time,
+the coercion?
+</p>
+</item>
+
+<item status="done">
+Fix computeGlobalConstants to recognize const char * const names[],
+e.g. in const.c
+<p>
+Introduced generic function isConstant.
+</p>
+</item>
+
+<item status="done">
+Fix computeGlobalConstants to  not  return NAs.
+<br/>
+Need to teach it about different types.
+<br/>
+Could handle arrays. Done
+<p>
+Why is it using printf? Because we are using this as
+a separate mechanism by which we can generate the
+R bindings to simple objects at build time, not at run-time.
+So we don't have to deal with struct's, etc. but just
+simple types.
+</p>
+</item>
+
+<item status="done" topic="tu parser">
+Teach the Perl code to concatenate multiple idx and val elements 
+for a GCC::Node::constructor node.
+</item>
+
+<item status="done">
+Conversion for arrays, e.g. the names variable in const.c const char * const names.
+Should actually be constant anyway.
+</item>
+
+<item status="done">
+resolveType now detects if dealing with a char * and identifies it as a CString object.
+</item>
+
+
+
+<item topic="C++">
+finalizer argument to C++ constructors.
+Affects the dispatchInfo/numUniqueArgs() computations so has to be 
+done at the right time.
+</item>
+
+<item status="low">
+Extend the CString to different types of common arrays, e.g. IntArray for int[].
+</item>
+
+ <item status="check">
+  <issue>
+  Differentiate between regular enums and bitwise enums, i.e. those used for x|y. I believe we have some heuristics in the code for this. </issue>
+</item>
+  
+  <item status="low"><issue>Handle new node types such as cleanup_point_expr, modify_expr in the C++ code.
+  Where is this used? initial and default values?</issue></item>
+
+  <item topic="tu parser" status="done"> 
+   Add an asText = TRUE/FALSE argument to parseTU so that
+   we can read the TU  in R as lines and then pass subsets to the Perl parser.
+   This will allow us to work with the outuput from dump-tree-original-raw below (next).
+  </item>
+
+  <item  status="done" topic="tu parser"><issue>Work with the output from -fdump-tree-orginal-raw.
+    This generates a series of trees (i.e. with nodes named @1, ...)
+    and includes lines of the form ;; Function ....
+    But this has the bodies of routines and works for gcc and g++ and
+    on the mac with 4.0.1 and on linux with 4.1.0
+    Using g++ seems (at first glance) more coherent. (See pointer.c)
+
+    -fdump-tree-original-raw-details
+<br/>
+   [Done] To deal with multiple graphs in the same file, we want the parser to be
+   able to handle the content as a string and not a file and then this would allow us to 
+   process the file in R.
+<br/>
+  [Done] See ContentSource and the different implementations.
+  This is only for the C++ parser. What about the Perl parser.
+
+<p>
+Get this working in Perl using parseTUString and the LineStream class.
+See tt.pl as a perl script to do the testing.
+</p>
+<p>
+In R,
+<pre>
+source("../../R/parseTU.R")
+> parseTUString(readLines("ABC.cpp.001t.tu"))
+</pre>
+</p>
+  </issue>
+  </item>
+
+  <item status="done">
+   Get the declarations of the new routines at the top of the file or in an include file.
+   Missing the R_copyStruct_fd_set in getrusage.xml.
+   See getrusage.xml as an example.
+<br/>
+  Use generateInterface() rather than createMethodBindings. 
+  </item>
+
+  <item status="done"><issue>out variables.  See gettimeofday in getrusage example (in examples).  
+       Want to allow caller to create their own refrence object ahead of time and pass that 
+       or create our own in R and pass that or use a local variable and copy its results back.
+      </issue> </item>
+
+  <item topic="C++"><issue>namespaces in C++ code. Enhance checkScope()</issue></item>
+
+
+ <item status="done"> Have the $ accessors for structs know the names of the possible fields </item>
+
+<item topic='C++' id="defaults" status="check">
+Default values for R function parameters corresponding to default values
+of C++ parameters.
+E.g. wxButton
+<pre>
+<![CDATA[
+    wxButton(wxWindow *parent, wxWindowID id,
+           const wxString& label = wxEmptyString,
+           const wxPoint& pos = wxDefaultPosition,
+           const wxSize& size = wxDefaultSize, long style = 0,
+           const wxValidator& validator = wxDefaul0tValidator,
+           const wxString& name = wxButtonNameStr)
+]]>
+</pre>
+<br/>
+See defaults.cpp.
+<pre>
+dflts.tu = parseTU("inst/examples/defaults.cpp.001t.tu")
+r = getRoutines(dflts.tu)
+rr = resolveType(r, dflts.tu)
+x = createMethodBinding(rr$foo)
+</pre>
+</item>
+
+<item topic="C++" status="check" id="C++dispatch">
+For overloaded methods with default arguments, we want to find
+the minimum number of arguments needed to disambiguate between
+the methods. See defaults.cpp and how we only
+<pre>
+dflts.tu = parseTU("inst/examples/defaults.cpp.001t.tu")
+b = createClassBindings(getClassNodes(tu)[["Z"]], dflts.tu)
+eval(parse(text = b$classDefinitions$Z$definition))
+.xCall = function(...) list(...)
+</pre>
+See the qcursor example in R/RQt/inst/TU/.
+<br/>
+createMethodBinding - generate the function
+createOverloadedDispatchCode - generate the method
+<r:code>
+cons = mm.qcursor[names(mm.qcursor) == "QCursor"]
+qcursor.bindings = lapply(cons, createMethodBinding,  "QCursor", TRUE, nodes = tu)
+createOverloadedDispatchCode("QCursor", qcursor.bindings, cons)
+</r:code>
+
+<p>
+See inst/examples/dispatch.cc and dispatch.R
+</p>
+</item>
+
+<item topic="C++">
+In the S4 dispatch for, handle the  .copy, .inherited
+
+</item>
+
+<item topic="C++" status="done">
+Where did the QCursor(Qt::Handle) constructor go ?
+<br/>
+The ifdef's mean it doesn't get compiled!
+On Unix goes through line qcursor.h, line 122., i.e. Q_WS_X11 defined and qdoc is not.
+</item>
+
+
+<item topic="C++" status="check">
+Why do we add a constructor that takes no arguments? (bindings.R#createClassBindings)
+<br/>
+Only do this if there is no explicit constructor.
+<br/>
+Couldn't we just create a C++ routine that is simply
+<c:code>
+ MyClass obj = new MyClass();
+ return(R_makeRef(obj, "MyClass"));
+</c:code>
+We are adding this here so that it just happens automatically for us
+</item>
+
+<item topic="C++" status="question">
+resolveType for type GCC::Node::typename_type
+<br/>
+Turn into a C++Typename.
+</item>
+
+
+
+<item topic="C++">
+resolveType for type GCC::Node::template_type_parm
+<br/>
+Create a "C++TemplateTypeParm" object.
+</item>
+
+<item status="done">
+getRoutines() for Qt tu file raises a problem with 
+getParameters().
+args[["type", convert = FALSE]] of class "GCC::Node::function_type" gives 1 element 
+and getArgList() returns 2.
+<p>
+Occurs in Qt tu with getRoutines() (set RQt/inst/TU/test.R)
+and for the routines __gthrw_pthread_* which are in 
+/usr/local/include/c++/4.2.1/i686-pc-linux-gnu/bits/,
+e.g. __gthrw(pthread_mutexattr_destroy) at line 107.
+Which expands to __gthrw2(symname, name, name)
+</p>
+<p>
+I have put the function name in the warning message.
+</p>
+<p>
+getParameters.GCC::Node::function_type returns 1 argument,
+args[["type", convert = FALSE]][["INDEX"]] => "88123"
+  getUnnamedParameters follows
+      "89658"
+It then finds a null
+</p>
+<p>
+getParameters."GCC::Node::parm_decl" returns 2.
+parms[["INDEX"]] => "88125" (parms comes from getArgList()
+</p>
+<p>
+Looks like they both find a void, but getUnnamedParameters
+knows to discard the last void but 
+</p>
+</item>
+
+<item>
+writeCode() methods for outputting the pre-processor defines/macros.
+</item>
+
+<item topic="C++">
+Support for templates
+</item>
+
+<item topic="C++" status="check">
+Get the default values into the R generic and methods.
+Find out what is really happening in R - see tests/Rdefaults.R
+Each method can have its own defaults.
+So we can lift our nested/internal function definition into the method definition.
+<br/>
+Where are the default values for parameters used?
+createRCode.
+<br/>
+Need an example using a method. See defaults.cpp
+<pre>
+createClassBindings(getClassNodes(tu)[["Z"]], tu)
+</pre>
+Stil more complicated yet by the creation of generic functions in R,
+so we first look at a simple, non-overloaded function (not method).
+See defaults.cpp and <xref linkend="defaults">todo</xref>.
+</item>
+
+<item topic="C++" status="done">
+Default values for C++ parameters seem to be NAs.
+Are we following the prms attribute in the type attribute of the function_decl
+as well as the args.
+<br/>
+getClassMethods calls getParameters() which calls getUnnamedParameters().
+The call to getValue() in this does the job, but gave the wrong thing for
+GCC::Node::var_decl nodes.
+<br/>
+Now where are these used?
+<p>
+See qcursor.R in RQt/inst/TU/ and inst/TU/dispatch.R here.
+</p>
+</item>
+
+<item topic="wxWidgets" status="low">
+ The default value for the style parameter in a wxWidgets constructor
+should be an enumeration not a simple value.
+<br/>
+This may not be possible from the information in the method
+as these are generic and not tied to particular enum values.
+</item>
+
+ <item topic="C++" status="check">
+    <issue>
+    Dump of code for wxGenericDirDialog constructor with 8/9 parameters gives silly value for point and size.
+     Same for wxImageHistogramBase.
+<br/>
+In R or C++ code? R!
+    </issue>
+<br/>
+See tests/wx.R
+<pre>
+wx  = parseTU("~/Projects/org/omegahat/R/RwxWidgets/autoGenerate/wx.cpp.001t.tu")
+classes = getClassNodes(wx)
+b = createClassBindings(classes[["wxGenericDirDialog"]], wx, "wxGenericDirDialog")
+m = getClassMethods(classes[["wxGenericDirDialog"]])
+mm = resolveType(m, wx)
+createMethodBinding(mm[[2]])$r
+</pre>
+</item>
+
+<item>
+In createMethodBinding, why have the assignment in the function definition,
+i.e. 
+<pre><![CDATA[
+ <- 
+function(parent, title = ....)
+]]></pre>
+</item>
+
+
+<item topic="C++ Derived" status="done">
+ <issue>Finish the derived class material. See the writeup in  derivedClass.xml.
+   <br/>
+   Protected access, multiple inheritance and constructor overload,
+   [[ operator to provide access to the fields.
+ </issue>
+</item>
+
+<item topic="wxWidgets">
+ <issue>Add the class hierarchy when we compute and set the class 
+   definition in R via the "classes" slot in wxObject.
+ </issue>
+</item>
+
+<item topic="wxWidgets">
+ <issue>
+  Identify the style argument in wxWidgets' constructors
+  (for which classes? only wxWindow objects?)
+  as being a bitlist.
+  <br/>
+   Can allow a hook function to be invoked, or alternatively
+   make the change after resolving the methods, i.e. leave
+   to the user to modify the wxResolvedMethods by herself
+   before calling the code generation code.
+ </issue>
+</item>
+
+
+<item status="check">
+ <issue>  Determine the include files for constants, etc.
+  based on the source() attribute of the node
+  defining the value.
+ <br/>
+   We have an example of using the expandConstantIncludeFileNames()
+   in run.R in RwxWidgets/autoGenerate/.
+ </issue>
+</item>
+
+
+
+<item topic="C++">
+<issue>C++ references as returned values.
+</issue>
+</item>
+
+
+<item topic="C++" status="done">
+In wxGenericDirDialog generated code, 
+we are missing the quotes for the second argument
+in calls to as(sz, wxSize), etc.
+this and parent have the right values?
+<br/>
+Use sQuote in the methods for C++ClassDefinition &amp; C++ReferenceType 
+for coerceRValue.
+</item>
+
+<item topic="C++">
+ <issue>Allow top/base class RC++Reference to be customized.
+<br/>
+See getRClassDefinitions (createClassBindings) , createDynamicCastCode (createClassBindings), 
+getReferenceDataTypes (called by generateInterface),
+generateGlobalVarCode (not called by anything), 
+generateStructInterface(called by getReferenceDataTypes), defineStructClass (called from generateStructInterface).
+</issue></item>
+
+ <item status="done">
+  <issue>Fix parameter names, etc. that are reserved words in R, e.g. next, 'function'.
+  </issue>
+<br/>
+See inst/examples/functionName.c
+
+ </item>
+
+ <item topic="C++ Derived" status="done">
+ <issue>Derived classes
+<br/>
+Include the protected methods
+   <br/>
+ names for methods that we can override.
+ </issue>
+ </item>
+
+<item topic='C++ Derived' status="done">
+Would dynamic casting (or some form) allow us to do super calls?
+<br/>
+No! See override_virtual.
+</item>
+
+ <item status="later">
+ <issue>
+  Loose attributes on elements, e.g. deprecated. Example in inst/examples/attributes.c.
+  Strangely, there is a field in the TU node saying used: 1 for the unused parameter.
+<br/>
+  This seems to be true.
+ </issue>
+ </item> 
+
+ <item status="low">
+  Allow the user to generate the code for an individual routine.
+  <br/>
+  generateInterface will do this.  So too will createMethodBinding.
+  See inst/doc/getrusage.xml.
+ </item>
+
+ <item>
+ <issue> Need to deal with the scope for var and function declaration nodes.
+  Currently just deal with type for these and don't hold onto the name, etc.
+  Need to deal with these separately at present.
+ </issue>
+ </item>
+
+ <item topic="C++">
+  <issue>toRInitializer(). create methods for handling these. Used in createMethodBinding.
+<br/>
+Can't we use getValue() ?  This is used for the default values for parameters. See <xref linkend="defaults">defaults.cpp</xref>.
+<br/>
+Only applies to C++. (?) Or initial value of variables.
+  </issue>
+   </item>
+
+ <item status="done">
+
+  <issue> Sort out createClassBindings and the higher-level version generateClassBindings. 
+  <br/>
+   Generate writes the files after calling createClassMethods
+
+  </issue>
+ </item>
+
+
+ <item status="done">
+   For non-typedef'ed enums which have a name, we have to emit the "enum name" in the C code.
+<br/>
+Define a method for getNativeDeclaration in getNativeDeclarations.R
+rather than using the generic method for TypeDefinition.
+ </item>
+
+
+ <item status="done">
+ <issue>Create routines to map to and from an enumerated value.
+ <br/>
+ Invoked by writeCode for an EnumerationDefinition and  so picked up via generateInterface.
+ <p>
+  Use these in the conversion to and from R.
+ </p>
+ <p>
+  Now need coercion of result to value.
+  Could do this in R or C.  See createREnumerationValue() routine in RAutoGenRunTime.
+ So we would need to spit out the enumeration names and values vector
+<br/>
+  Coercion of R arguments, okay.
+  Check out/inout arguments.
+ </p>
+ </issue>
+<pre>
+tu = parseTU("enum.c.001t.tu")
+iface = generateInterface(tu)
+writeCode(iface, "r")
+</pre>
+ </item>
+
+<item status="done">
+Typedef'ed enum coming out as c(NA = NULL) in the generateInterface and in the generated C code
+yet the definition seems to be there in the R code.
+<pre>
+tu = parseTU("enum.c.001t.tu")
+rr = getRoutines(tu, "enum")
+resolveType(rr[["setStatus"]], tu)
+
+iface = generateInterface(tu)
+writeCode(iface, "r")
+</pre>
+<p>
+See getEnumDef in types.R
+</p>
+</item>
+
+
+
+  <item>
+  
+  </item>
+  <item topic="C++ Derived" status="done">   
+  
+  <issue>
+   Want to be able to use R classes to lock down the methods for all instances of such classes
+   as well as allowing per-instance modifications.
+   i.e. a centralized method table for the class but also allow per instance table.
+   So have a pointer in the new class that refers to the shared table. And when we want, 
+   we can create our own table and  make that instance-specific.
+   Allow the R user/programmer to get that table and set it for another instance.
+  </issue>
+ </item>
+
+<item topic="C++ Derived" status="low">
+  Create a new C++ class for each derived class and give it a static
+  field for holding the centralized methods.  Alternatively, just
+  maintain a central R table indexed by class name and fetch the table
+  from this. This approach means we don't have to create new classes.
+  These are two different approaches for different circumstances.  One
+  is for when we generate C++ code and compile it and the other is
+  when we don't but leverage the generic, run-time RC++ class that
+  acts as a template for all derived C++ classes and is used via multiple inheritance.
+<br/>
+In other words, allow this to be a run-time thing! Do we  care?
+</item>
+
+ <item topic="C++" status="done">
+ <issue>method dispatching in R to get at C++ code. Do we have the classes setup?
+<br/>
+Connected to <xref linkend="C++dispatch">dispatch</xref>
+ </issue>
+ </item>
+
+ <item topic="wxWidgets">
+  <issue>wxGtkNotebookPagesList  iterator, etc. not defined.
+  </issue>
+ </item>
+
+ <item topic="wxWidgets">
+  <issue>wxFileCtrl_SortItems - fileListFieldType not defined.
+  It is an enum within wxFileData in filedlgg.h
+  </issue>
+ </item>
+
+ <item topic="wxWidgets">
+  <issue>Some classes are declared as NO_COPY_CLASS which we might be able to use to determine if we 
+   can copy an instance
+  </issue>
+ </item>
+
+ <item topic="wxWidgets">
+  <issue> wxBufferedInputStream.  Trying to allocate a new InputStream which is a pure class.
+  
+   wxChoiceBase also. wxControlWithItems, wxDC, wxFilterInputStream.cpp
+
+    In isAbstractClass, need to go up the class hierarchy and determine if any of the
+    ancestor classes are pure and if so, are the pure methods implemented in our particular 
+    classs!
+  </issue>
+ </item>
+
+ <item topic="wxWidgets">
+  <issue> reverse_iterator in wxArrayInt.  This class is defined in dynarray.h
+  </issue>
+ </item>
+
+
+ <item topic="wxWidgets">
+  <issue>converter for wxChar in, e.g. wxAppBase_Initialize. Need to be able to specify our own converter methods.
+  </issue>
+ </item>
+
+ <item topic="wxWidgets"> 
+  <issue>
+   wxAcceleratorTable.cpp - handle const types by putting the declaration of the local variable
+  inline with the calculation.
+  </issue>
+ </item>
+ <item>
+  <issue>
+   Unused argument names. See SaveFile in wxANIHandler in wx/imagbmp.h.
+  </issue>
+ </item>
+
+ <item status="lost">
+   <issue>Investigate node 237358.  Failing in resolveType for record_type
+   with "Not certain  what to do with this record_type node"
+   Same with 1640 from processing  wxDynamicEventTableEntry
+   </issue>
+<p>Don't know what file this refers to.</p>
+ </item>
+
+ <item status="done">
+  <issue>resolveType for array_type
+  </issue>
+<p>
+Get an ArrayType.
+</p>
+<pre>
+arr.tu = parseTU("array.c.001t.tu")
+g = getGlobalVariables(arr.tu)
+resolveType(g[["a"]], arr.tu)@type
+resolveType(g[["a"]], arr.tu)@type@length
+resolveType(g[["a"]], arr.tu)@type@type@length
+resolveType(g[["x"]], arr.tu)@type
+</pre>
+ </item>
+
+ <item status="done">
+  <issue >
+    Avoiding call new for virtual classes, e.g. wxEvent in wxEvent.cpp constructor.
+<para/>
+  This is now fixed in createClassBindings where we determine if the class is pure/abstract or not
+  and if it is, we discard the constructor methods from our bindings.
+  </issue>
+ </item>
+
+ <item status="done">
+Change the !missing(classDefs) in resolveType methods to !is.null(classDefs) or length(classDefs) > 0.
+  Latter won't work for environments.
+ </item>
+
+ <item status="done">
+<issue>
+  The type of an object in resolveType is changing across invocations.
+ These are different computations as they are cached but that is 
+<pre>
+tu = parseTU("globals/globals.c.001t.tu")
+> unclass(tu)[["language"]]
+[1] "C"
+> rr = getRoutines(tu, "globals")
+> unclass(tu)[["language"]]
+[1] "C"
+> class(resolveType(rr, tu)$useInt)
+[1] "ResolvedNativeRoutine"
+> resolveType(rr, tu)$useInt
+[1] " :: useInt ( int x )"
+> class(resolveType(rr, tu)$useInt)
+[1] "ResolvedNativeClassMethod" "StaticMethod"             
+</pre>
+Is one thing being assigned to the DefinitionContainer and another thing being returned?
+The issue was that one method called another which registered the object and then
+that top-level method did not register its result. So indeed, returning one
+thing and registering another.
+<pre popup="true" id="resolve">
+tu = parseTU("globals/globals.c.001t.tu")
+rr = getRoutines(tu, "globals")
+a = resolveType(rr$useInt, tu)
+b = resolveType(rr$useInt, tu)
+</pre>
+</issue>
+ </item>
+
+ <item status="done">
+   Bug: In C code, we are using :: to qualify top-level symbols.
+<br/>
+  Seems to be working.
+<br/>
+I think this might have been related to the problem with 
+a routine being resolved a second time to a Method rather than 
+a regular routine.  This was caused by the use of the
+C++ Method related mechanism to get the pieces and not re-registering
+the resulting routine description with the DefinitionContainer. 
+Now that this is fixed, the :: seems to have disappeared.
+ </item>
+
+ <item status="check">
+  <issue> Allow user to specify a filter to exclude (or include) certain symbols.  </issue>
+  <br/>
+  generateInterface() allows this, albeit not entirely simply.
+  One can specify the routines  and  the global variables
+  by name and the remaining computations for dependent data structures, etc. will be done automatically.
+  omitPattern can also be used.
+<pre>
+tu = parseTU("globals/globals.c.001t.tu")
+iface = generateInterface(tu, c("update_a", "update_aref", "useInt"), variables = c("a", "aref", "i"))
+</pre>
+ </item>
+
+<item status="check"> Bug in general interface generation (i.e. with no subsetting/restrictions to specific symbols)
+<pre>
+tu = parseTU("globals/globals.c.001t.tu")
+z = generateInterface(tu)
+</pre>
+Looks like we don't have a converter for the RoutineDescription back to R.
+This would be an external pointer and we want to have the number and types of parameters.
+</item>
+
+<item status="done">
+ The files argument for getGlobalVariables() behaves differently from
+ that of getRoutines().
+ <br/>
+ They are both parameters now and use the checkSource() function.
+</item>
+
+ <item status="check">
+  getRoutines() has allowBuiltIns which is passed to checkSourceFile, but if 
+  checkSourceFile was, say, isSourceFile, then that does not take the allowBuiltIns.
+  <br/>
+  Use a ....  Alternatively, the user can provide a function that passes the additional arguments:
+ <pre>
+   getRoutines(..., checkSourceFile = function(x, files) checkSourceFile(x, files, allowBuiltIns = TRUE))
+ </pre>
+  
+ </item>
+
+ <item topic="wxWidgets" status="high">
+ <issue>
+   Error when generating bindings for  wxEventTableEntryPointerArray 
+ </issue>
+ </item>
+
+ <item status="done">
+ <issue>
+   Names of overloaded routines are messed up for wxKeyEvent.cpp because of spaces in the
+  basic data types, e.g long int.
+ <para/>
+   Do a gsub() to replace spaces with _.
+ </issue>
+ </item>
+
+
+
+ <item status="later">
+<issue >
+  We are initializing the return value when it is declared
+  for a C++ClassDefinition. Need to know if it is the return type.
+  wxListEvent.cpp GetItem()
+ <para/>
+ This is fixed now in createMethodBinding by doing a lot of extra
+computation. There are lots of things that we have to do to make this more general.
+We really need to work from the C++ class definition and look at its constructors.
+</issue>
+ </item>
+
+
+ <item status="done">
+ <issue>
+   Static methods aren't being called with arguments.
+   It is just the call. See wxIdleEvent.cpp
+ </issue>
+ </item>
+
+
+ <item status="done">
+<issue>
+  Investigate why the return type for GetHandle in wxWindow has an extra level of indirection for the pointer type.
+</issue>
+ </item>
+
+ <item status="done">
+<issue>
+ Identify destructors as a special class and don't generate bindings for them.
+</issue>
+ </item>
+
+ <item status="done">
+<issue>
+   Catch the names of variables thare are all numbers.
+   Fix getParameters.
+</issue>
+ </item>
+
+<item status="done">
+<issue>
+ How do we know when a method is static?  Doesn't appear to tell us in the translation unit.
+ See examples/myClass.cc
+</issue>
+</item>
+
+ <item>
+  <issue>look into resolveType for record_type and the presence of an unql</issue>
+<issue>
+   Currently I turned it off.  Probably want to follow the unql.
+</issue>
+<br/>
+A RECORD_TYPE is used to represent a struct or class
+as well as pointers to member functions
+ </item>
+
+
+ <item status="done">
+ <issue>
+  When parameters don't have names, don't pretend they do by using the node name.
+ </issue>
+ </item>
+<item status="done">
+ If the file does not exist and the text doesn't look like the contents of a TU file (e.g. starts with @)
+ then report an error. 
+</item>
+
+
+ <item status="done">
+   <issue>Differentiate between struct and class</issue>
+<p>
+  Figure out that wxString is not a typedef. 
+  It is not obvious in C++ that there is a difference in any meaningful way.
+  We now added a check to see if we are dealing with C++ nodes.
+</p>
+
+ </item>
+
+
+ <item status="done">
+  <issue>Differentiate between C and C++ code and change the resolveType accordingly
+ to return StructDefinition or C++ClassDefinition respectively.
+  </issue>
+ <p>
+We can set the language in the parser object and it is determined by default from the file extension.
+This is then used when creating the representations of the code elements, e.g. StructDefinition
+or C++ClassDefinition.
+ </p>
+ <pre>
+  tu = parseTU("ABC.cpp.001t.tu")
+  k =getClassNodes(tu)
+  class(resolveType(k[["A"]], tu))
+
+  tu.structs = parseTU("structs.c.001t.tu")
+  ds = getDataStructures(tu.structs)
+  resolveType(ds[["A"]], tu.structs)
+  class( resolveType(ds[["A"]], tu.structs)@type)
+ </pre>
+ </item>
+
+
+ <item status="low">
+   <issue>aggr_init_expr and getValue method</issue>
+<issue>
+  Have a basic method that needs to be completed, or more specifically the code that generates bindings need to process the object properly.
+</issue>
+ </item>
+
+  <item topic="C++" id="record_type" status="low">
+ <issue>Check on the nodes that are discarded in resolveType for record_type
+  when processing fields.</issue>  
+  <issue>If the node is not a field_decl, we discard it.
+  What are we loosing?
+
+<comment>
+ const_decl for one.
+See wxDeclarations[[852]] where wxDeclarations come from reading wx.cpp.tu.
+  For instance, in wxString, these are enums for caseCompare and stripType
+ that are used in methods for this class.
+ There are others, e.g. for MoveBefore in wxWindowBase.
+<r:code>
+createClassBindings(wx[[wxClasses$wxWindow]], wx)
+
+wxClasses = getClassNodes(wx, targets)
+wxMethods = lapply(wxClasses[ - length(wxClasses) ], function(x) getClassMethods(wx [[ x ]]) )
+</r:code>
+  In other cases, we have var_decl elements which all are part of 
+ the dynamic class information embedded in DECLARE_DYNAMIC_CLASS and giving
+ rise to  a static variable ms_classInfo.
+</comment>
+<pre>
+records = getAll(wx, "GCC::Node::record_type")
+f = 
+function(x)
+{
+  n = x[["flds", convert = FALSE]]
+  ans = list()
+  while(TRUE) {
+     ans[[length(ans) + 1]] = n
+     names(ans)[length(ans)] = class(n)[1]
+     if("chan" %in% names(n))
+         n = n[["chan", convert = FALSE]]
+     else
+       break
+  }
+  ans
+}
+fields = lapply(records, f)
+types = table(unlist(lapply(fields, names)))
+ GCC::Node::const_decl    GCC::Node::field_decl GCC::Node::template_decl 
+                    1143                     7531                       18 
+    GCC::Node::type_decl      GCC::Node::var_decl 
+                    6599                     1816 
+</pre>
+The const_decl elements are enumeration values.
+var_decl are variables  within a class.
+
+Take a look at 
+<pre>
+names(fields[["wxTextCtrlBase"]])
+[1] "GCC::Node::field_decl" "GCC::Node::field_decl" "GCC::Node::const_decl"
+[4] "GCC::Node::const_decl" "GCC::Node::field_decl" "GCC::Node::field_decl"
+[7] "GCC::Node::var_decl"   "GCC::Node::type_decl"  "GCC::Node::type_decl" 
+sapply(fields[["wxTextCtrlBase"]], getNodeName)
+   GCC::Node::field_decl    GCC::Node::field_decl    GCC::Node::const_decl 
+                "315670"                 "317114"     "SetValue_SendEvent" 
+   GCC::Node::const_decl    GCC::Node::field_decl    GCC::Node::field_decl 
+"SetValue_SelectionOnly"             "m_filename"         "m_defaultStyle" 
+     GCC::Node::var_decl     GCC::Node::type_decl     GCC::Node::type_decl 
+          "ms_classInfo"         "wxTextCtrlBase"                  "._127" 
+</pre>
+These are in textctrl.h in the top-level wx/ directory.
+<wrong>
+The two type_decl's at the end seem to correspond to the macros
+<pre>
+    DECLARE_NO_COPY_CLASS(wxTextCtrlBase)
+    DECLARE_ABSTRACT_CLASS(wxTextCtrlBase)
+</pre>
+See wx/defs.h and wx/object.h for definitions, respectively.
+</wrong>
+The ms_classInfo. comes from DECLARE_ABSTRACT_CLASS.
+The final two type_decl elements seem to be artificially created by the compiler.
+<pre>
+w = sapply(names(fields), function(id) {
+           x = fields[[id]] 
+           w = sapply(x, inherits, "GCC::Node::type_decl")
+           if(!any(w)) 
+              return(character()) 
+           sapply(x[w], getNodeName)
+      })
+
+# Find all the w elements which have a type_decl element in their list
+# of "fields" with the same name as the class being defined.
+o = sapply(seq(along = w), function(i) names(w)[i] %in% w[[i]])
+
+  # The record_types which don't have a field with a type decl with the same name
+  # 1155 of these out of 3053
+names(w)[!o]
+  # These include many Gtk objects
+
+ # All those that start with  "wx"
+grep("^wx", names(w)[!o], value = TRUE)
+  # The wx{Input,Output}Stream* clases, 
+
+ # And the rest
+names(w)[!o][-grep("^wx", names(w)[!o])]
+  # Templates, etc. that look like typedefs
+
+<![CDATA[
+o = sapply(seq(along = w), function(i) length(w[[i]]) == 1 && names(w)[i] == w[[i]])
+sum(o)
+]]>
+
+names(w)[o]
+names(w)[!o]
+</pre>
+</issue>
+  </item>
+
+  <item>
+  <issue>Identify undefined but declared structures, etc.</issue>
+<issue>
+  See struct B in  structs.c
+</issue>
+   </item>
+
+  <item status="low">
+  <issue>Unnamed declarations when processing C code</issue>
+<issue>
+  In structs.c.tu, getAllDeclarations() returns entries with ""
+ and misses the un-typedef'ed struct definition F.
+  So we need to figure out what is being duplicated here.
+  May need to know what we have visited and processed up to this point
+  in the iteration.
+<para/>
+<r:code>
+wx = parseTU("wx.cpp.tu")
+decls = getAllDeclarations(wx)
+which(names(decls) == "")
+</r:code>
+yields no entries.
+</issue>
+   </item>
+
+
+  <item status="later">
+   <issue>R functions as pointers to routines</issue>
+<issue>
+     Use the distance as an example.
+</issue>
+   </item>
+
+  <item status="done">
+  <issue>Classes for struct and reference to struct.</issue>
+<issue>
+   Not necessary for a class since we don't want to allow copies of a class
+   object, but only references to them. However, for structures
+    we need both.  Consistency (with what - C++ classes) would be nice, but it is simpler to refer
+   to a reference to a class instance by the class name rather than ARef.
+</issue>
+  </item>
+
+  <item>
+  <issue>Copying values in R objects to C/C++ values</issue>
+  <issue>
+    Need to specify the memory management model.
+   <br/>
+    Applies to strings, arrays of numbers, etc.
+  </issue>
+   </item>
+
+
+ <item topic="C++ Derived" status="done">
+  Generate derived classes that can be implemented with R functions as methods
+ </item>
+
+  <item status="low">
+  <issue>In-out and out arguments.</issue>
+  <issue>
+    Can identify these as references/pointers to values that 
+    where the declarations are not constant.
+  </issue>
+  </item>
+
+  <item status="check"> 
+   <issue>Allow for copying or getting a reference to complex data structure being returned.</issue>
+   E.g. getrusage() ?
+  </item>
+
+  <item status="done">
+  <issue>Structures and being able to copy entire structures, elements, references, etc.</issue>
+ <issue>
+   Define a reference class and actual instance class and have coercion methods for the two.
+</issue>
+  </item>
+
+
+  <item status="low">
+   <issue>Identify C++ methods that we want to override and don't necessarily make an interface to these</issue>
+   Specifically, there are some methods that we override in a newly derived class and these methods will be called
+    by wxWidgets asynchronously rather than directly by R users.  We don't necessarily want those in our namespace.
+    Can we identify these?
+  </item>
+    
+  <item status="low">
+  <issue>Names for R functions are ridiculously long.
+  </issue> 
+  <issue>
+    Need to get them to the same form as the generic function, e.g.
+      R_wxGridEvent_wxGridEvent_wxGridEvent needs to be wxGridEvent.
+ <p/>
+    But how did this show up in the first place?
+    Are these only seen in the methods for the generic functions?
+    Looks like it. So they would not be exported.
+  </issue>
+  </item>
+
+  <item topic="wxWidgets">
+ <issue>
+ wxGridCellCoordsArray
+  Sort method as a screwed up second parameter PointerType with NAs for typeName and name.
+ Same with wxGridStringArray
+ <comment>
+ This is the function comparator.
+ The parm_decl node "@133118" (p[[ 133119 ]]).
+<r:code>
+ library(RGCCTranslationUnit); p = parseTU("inst/examples/wxGrid.cpp.tu"); k = getClassNodes(p, "grid"); cat("Creating bindings\n") ; 
+ createClassBindings( p [[ k$wxGridStringArray ]], p)
+</r:code>
+
+  Now doesn't throw an error. Need to look at the resulting code.
+
+ </comment>
+ </issue>
+
+ </item>
+</topic>
+
+</topics>
+

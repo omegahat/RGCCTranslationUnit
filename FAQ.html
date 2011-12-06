@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title></title>
+</head>
+
+<body>
+<h1></h1>
+<dl>
+
+
+  <dt>
+   <li> I load the package with library(RGCCTranslationUnit) and
+       then try to call parseTU() but I get an error message about
+       not being able to load GCC::TranslationUnit.
+       Any suggestions?
+  <dd>
+      The RGCCTranslation package makes use of  the
+  GCC::TranslationUnit module that is distributed
+  as part of this R package. This is installed within
+    the installed R package and when the package is
+    loaded into R, the PERL5LIB path is updated.
+   When you load RSPerl (implicitly by a call to parseTU()),
+      this PERL5LIB is used to locate the Perl modules.
+      Run
+<pre>      
+      paste("find", system.file("perl", package =  "RGCCTranslationUnit"), "-name '*.pm')
+</pre>      
+    from within R and hopefully you will get output that tells you the
+      .pm files are in the installed R  directory. If not,
+      then reinstall the RGCCTranslationUnit and watch to see if the
+      Perl module was installed correctly.
+
+      <p/>
+      If the .pm files are present, then the PERL5LIB is set
+      incorrectly.
+      At present, we are just setting the value to the ususual
+      <i>installation directory</i>/share/perl/lib/perl5/site_perl.
+      If it should be different for your system, set PERL5LIB before
+      you start R (or within R using Sys.setenv() but before loading
+      RSPerl)   and send me mail to let me know what it should be for
+      your system.
+
+  <dt>
+  <li> I want to use this from within R via the RSPerl package.
+       However, when I try to refer to GCC::TranslationUnit, I get
+       a segmentation fault.  Can I solve this problem?
+  <dd>
+        Yep! One of the problematic issues of embedding Perl within
+      another application, e.g. R,  is that using Perl modules
+      that themselves use C code need special handling.
+       When installing the RSPerl package, use
+<pre>      
+ R CMD INSTALL --clean --configure-args='--with-in-perl
+      --with-modules="IO Fcntl Socket POSIX"' RSPerl
+</pre>
+       This builds support for the modules IO, Fcntl and Socket for use within
+      this embedded setup. Without these, we unfortunately get crashes
+      within R. The RSPerl package currently cannot detect the
+      problem.
+      If you are using compressed files (as the .tu files are rather
+      large),
+      you should also both install the Perl modules
+      Compress::Raw::Zlib and File::Glob
+      and include them in the list of modules (in that form of naming)
+      in the installation of
+      RSPerl. Yes - this is annoying!
+
+  <dt>
+  <li> I tried the installation as suggested with the PERL_MODULES
+      above, but I still get segmentation faults when I try to call
+      parseTU().  Any other suggestions? @#$!!!
+  <dd>
+      Yep, but this one is even less pleasant. My guess is that you
+      have a multi-threaded version of Perl, i.e. when you give the R
+      command
+<pre>
+      library(RSPerl)
+      .PerlGetArray("INC")
+</pre>
+      some of the elements have
+      "thread-multi" in the directory name.
+      <br>
+      If this is the case, for the moment, you will have to install
+      a version of perl in a separate place on your machine that has
+      no
+      thread support.
+      
+  <dt>
+  <li> What's the overhead or penalty for using compressed tu files,
+      i.e. tu.gz files?
+  <dd>
+      Well, on one of my machines - a hyper-threaded 3.2 GHz Pentium 4
+      with 1 GB of physical RAM and 3 GB of swap - the timings I got
+       for the wxWidgets file wx/grid.cpp.tu  was a factor of 4.
+<table>
+<tr>
+<td>uncompressed file</td>  <td>21.840</td><td>0.230</td><td>22.167</td>
+</tr>
+<tr>
+<td>compressed .gz file</td> <td> 81.960</td><td>  0.210</td><td> 82.315</td>
+</tr>  
+
+
+<dt>
+<li> I generate the TU file from a C++ code that contains the
+    definitions  of several classes.  But when I read the contents of
+    the TU  file into R and call <code>getClassNodes()</code>,
+    not all the classes appear. What's the problem?
+    
+<dd>  Most likely, g++ is eliminating the classes that are not used in
+    your code.  If no C++ code actually creates or operates on an
+    instance of this class (or refers to static methods),
+    then the compiler assumes that class is not needed.
+    So you can add some simple code that manipulates
+    such an object, e.g. for a class named A
+<pre>
+void _dummy() {
+  A a;  // or use an appropriate constructor.
+}
+</pre>
+
+
+<dt>
+<li> I want to use -D_GNU_SOURCE and get some additional information
+    and I am using the regular gcc compiler. However, I still don't
+    get  this extra information.
+<dd>
+    Some code in system header files, etc. have a clause such as
+<pre>
+#if defined __USE_GNU && !defined __cplusplus
+typedef enum __rlimit_resource __rlimit_resource_t;
+typedef enum __rusage_who __rusage_who_t;
+typedef enum __priority_which __priority_which_t;
+#else
+typedef int __rlimit_resource_t;
+typedef int __rusage_who_t;
+typedef int __priority_which_t;
+#endif    
+</pre>    
+(see sys/resource.h).
+To get this extra information from using __USE_GNU which is
+ defined when _GNU_SOURCE is passed on the command line
+ (or in a file), we must also ensure that
+ the macro symbol __cplusplus is not defined.
+    It would be if we are using g++.
+    But it turns out that, at least with certain versions of gcc
+    if not all of them,  having a .cc extension on a file will
+    cause this macro symbol to be defined.  So you must
+    use a simple .c extension for the file before passing
+    it to gcc to dump the translation unit.
+    Annoying!
+    
+</dl>
+
+
+<hr>
+<address><a href="http://www.stat.ucdavis.edu/~duncan">Duncan Temple Lang</a>
+<a href=mailto:duncan@wald.ucdavis.edu>&lt;duncan@wald.ucdavis.edu&gt;</a></address>
+<!-- hhmts start -->
+Last modified: Thu Oct  4 12:05:58 PDT 2007
+<!-- hhmts end -->
+</body> </html>

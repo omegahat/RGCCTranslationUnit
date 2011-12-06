@@ -1,0 +1,9 @@
+WX_CFLAGS=$(shell wx-config --cflags)
+PKG_CFLAGS=-I../src  $(WX_CFLAGS) -I$(OMEGA_HOME)/R/RAutoGenRunTime/inst/include
+PKG_CXXFLAGS=-I../src  $(WX_CFLAGS) -I$(OMEGA_HOME)/R/RAutoGenRunTime/inst/include
+
+
+structs.o: structs.h structs.c
+
+
+

@@ -1,0 +1,14 @@
+Version 3.4.6 doesn't give up its class nodes in the same way.
+These are not in the chain. One would have to search for them 
+sequentially through all the nodes.
+
+3.2.3 returns all the defined classes and structures, not just those 
+that are used.
+
+4.2.0 and 4.2.1
+
+
+tus = structure(lapply(list.files( pattern = "tu"), parseTU),
+		   names = list.files( pattern = "tu"))
+
+lapply(tus, function(x) names(getClassNodes(x, "ABC")))

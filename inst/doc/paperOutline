@@ -1,0 +1,107 @@
+Acknowledge the GCC-TranslationUnit module.
+
+
+\section{What does the package do?}
+  Gets reflection information from C/C++ code via the compiler.
+  Tools to utilize this information to create derived code that
+  interfaces to it from R.
+  Can generate registration information, analyze software
+  for motifs/idioms, find inout and out parameters, 
+  determine who owns the memory for objects, 
+  compute call graphs and class hierarchies.
+  
+\section{Why is this important/useful?}
+  
+  Remove the tedious, error-prone and time consuming labor of manually
+  generating and maintaining information that makes native code
+  available to R.
+
+   Analyze code for particular purposes such as removing non-local
+   variables by identifying where such variables are used and
+   suggesting grouping into structures and where to add parameters to
+   routine definitions and where they are called.  Threading is the
+   target here.
+
+   Do statistics on code itself for software reliability, bug
+   prediction, integrate with version control data, bug tracking data,
+   email data. Finding motifs.
+
+\section{Guide as how to use this.}
+  wrapper generation.
+    simple example , e.g. for dirent, or  tcp data reader, basics of jpeg
+    complex example:  wxWidgets
+   say how long it takes to run.
+
+  registration information.
+  global variables and where they are referenced.
+
+   Get call graph between routines - see callGraph.cpp in
+   inst/examples/ and getCallGraph
+  
+
+\section{Characteristics of Generated Code}
+    characteristics of the generate code
+    external references
+         customizing memory management
+    marshalling 
+        copying structures, shallow and deep.
+    polymorphism
+    enumerations
+
+    Implementing C++ classes with R methods.
+
+    R functions as values for pointers to C routines.
+
+  Run-time characteristics 
+
+
+\section{Outline of approach}
+ This part gives an overview of the architecture of the package 
+  to others who might want to adapt this material.
+Why might they want to do this? different binding approaches, memory
+ management, etc.
+
+  read the tu via RSPerl
+  resolving types  - 
+      special container for managing resolved. Come back to this later
+      in this section
+  building descriptions of classes, routines, etc. 
+  generating output - writeCode
+
+
+\section{Limitations}
+  need specific version of gcc/g++ at present to be able to handle all the details.
+   gcc 4.1.0 works for registration information and call graph
+    just not for classes
+    and raises errors.
+   not shipping with intel macs
+ 
+  
+  doesn't see pre-processor macros.  
+
+  needs extra, external step of creating the .tu file, but this is always going
+  to be necesssary to get compilation flags right.
+    SWIG doesn't do this, but requires  the user to specify the .i file.
+ 
+  potentially get different generated code for different machines
+  based on differences in compiler on different machines.
+  Probably the code is not portable.
+
+  speed of processing.
+
+
+\section{Alternative Approaches}
+
+  patching gcc/g++ and using gcc-xml
+
+  SWIG.
+  SIP
+  
+
+Future work
+  
+  potentially write parser in C
+
+  update for newer versions of gcc/g++
+
+  customizability for different generators

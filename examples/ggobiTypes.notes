@@ -1,0 +1,29 @@
+The following are typedefs.
+
+vartabled  defined vartable.h:98
+
+ no name.
+
+  @548  has a name @633 and 
+              type @476
+                  unql -> @549
+
+  @634 type_decl
+    @549  record_type   struct
+       fields    @551
+          @551 field_decl  
+
+
+
+enum     NewVariableType
+
+  @2571
+          
+
+ 
+
+struct {
+
+} Foo;
+
+typedef

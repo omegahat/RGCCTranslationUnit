@@ -1,0 +1,289 @@
+<?xml version="1.0"?>
+
+<article xmlns:r="http://www.r-project.org">
+<section>
+<title></title>
+
+<para>
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU("shapes.cc.001t.tu")
+klasses = getClassNodes(tu, "shapes")
+names(klasses)
+</r:code>
+
+<r:code>
+methods = lapply(klasses, getClassMethods)
+resolved.methods = lapply(methods, resolveType, tu)
+classDefs = lapply(klasses, resolveType, tu)
+</r:code>
+
+
+<r:code>
+# resolved.methods = structure(lapply(resolved.methods, augmentVirtualMethods), class = class(resolved.methods))
+</r:code>
+
+<r:code>
+isVirtual = sapply(resolved.methods, isVirtualClass)
+</r:code>
+
+<r:code>
+resolved.methods = filterInheritedVirtualMethods(resolved.methods, classDefs)
+w = c("Ellipse", "Circle", "Shape", "Rectangle", "MyClass")
+w = names(resolved.methods)
+derivedClasses = lapply(names(resolved.methods[w]),
+                           function(id)
+                               createDerivedClass(id, tu, classNodes = klasses, 
+                                                   methods = resolved.methods, classDefs = classDefs))
+names(derivedClasses) = names(resolved.methods[w])
+</r:code>
+
+<r:code>
+cc = createDerivedClass("C", tu, classNodes = klasses, methods = resolved.methods, classDefs = classDefs)
+</r:code>
+
+<r:code>
+i = !(names(resolved.methods) %in% "Shape")
+con = file("classes.cc", "w")
+writeIncludes('"shapes.h"', con)
+sapply(derivedClasses[i], writeCode, "native", file = con)
+close(con)
+
+con = file("classes.R", "w")
+sapply(derivedClasses[i], writeCode, "r", file = con)
+close(con)
+</r:code>
+
+<r:code>
+writeCode(derivedClasses$Circle, "native", file = "myCircle.cc", includes = '"shapes.h"')
+writeCode(derivedClasses$Circle, "r", file = "myCircle.R", includes = '"shapes.h"')
+</r:code>
+</para>
+
+<para>
+ifaces = lapply(names(klasses),
+                function(i) createClassBindings(klasses[[i]], tu, resolvedMethods = resolved.methods[[i]]))
+names(ifaces) =  names(klasses)
+
+writeCode(ifaces$Circle, "native", "xCircle.cc", includes = c('"shapes.h"', '<RDerivedClass.h>'))
+</para>
+<para>
+
+<r:code>
+b = createClassBindings(klasses[["Circle"]], tu, resolvedMethods = resolved.methods[["Circle"]])
+writeCode(b, "r")
+writeCode(b, "c")
+
+</r:code>
+
+We could add a _super parameter to each virtual function  
+<r:code>
+resolved.methods = lapply(resolved.methods, function(x) structure(lapply(x, addSuperToVirtual), class = class(x)))
+b = createClassBindings(klasses[["Circle"]], tu, resolvedMethods = zz[["Circle"]])
+</r:code>
+
+<r:code>
+b = createClassBindings(klasses[["Circle"]], tu, resolvedMethods = resolved.methods[["Circle"]])
+</r:code>
+</para>
+
+<para>
+setClass("Shape", contains = "C++Reference")
+sapply(c("Rectangle", "Circle", "Ellipse"),
+        setClass, contains = "Shape", where = globalenv())
+</para>
+
+</section>
+
+
+<section>
+<title>Tests</title>
+<r:code>
+ x = RCircle(1, 2, 3, list("area()" = function(this){cat("In area\n"); 10}))
+ area(x)
+</r:code>
+
+<r:code>
+ x = RCircle(1, 2, 3, list(area = function(this){cat("In area\n"); 10})) 
+</r:code>
+
+<r:code>
+ x = RCircle(1, 2, 3, list("area()" = function(this){cat("In area\n"); 10}))
+ x = RCircle(1, 2, 3, list(area = function(this){cat("In area\n"); 10})) 
+ area(x)
+
+methods = list("area()" = function(this){cat("In area\n"); 10},
+               "scale(int)" = function(this, x) {cat("In scale(int)\n")},
+               "scale(int, int)" = function(this, x, y) { cat("In scale(int, int)\n"); 11})
+
+ x = RCircle(1, 2, 3, methods)
+</r:code>
+<r:code>
+ .Call("R_Circle_scale_p1Circle_int", x, 10L, FALSE)
+ .Call("R_Circle_scale_p1Circle_int", x, 10L, TRUE)
+
+  .Call("R_Circle_scale_p1Circle_int", x, 10L, TRUE)
+</r:code>
+
+
+<r:code>
+ .Call("R_RCircle_scale_p1Circle_int_int", x, 20L, 3L, FALSE)
+    # This next call ends up in a call to scale(int) since Circle::scale(int, int)
+    # calls Circle::scale(int) which is now implemented in our method list.
+  .Call("R_RCircle_scale_p1Circle_int_int", x, 20L, 3L, TRUE)
+  .Call("R_RCircle_scale_p1Circle_int_int", x, 20L, 3L, "Circle") 
+</r:code>
+
+<section>
+<title>Class-level methods</title>
+<para>
+This illustrates the use of class-level methods
+rather than instance-specific methods.
+<r:code>
+source("RCircle.R"); source("myCircle.R")
+methods = list("area()" = function(this){cat("In area\n"); 10},
+               "scale(int)" = function(this, x) {cat("In scale(int)\n")},
+               "scale(int, int)" = function(this, x, y) { cat("In scale(int, int)\n"); 11})
+
+.Call("R_RCircle_set_R_sharedClassMethods", methods)
+.Call("R_RCircle_get_R_sharedClassMethods")
+ x = RCircle(1, 2, 3)
+
+  # Now call the area() method and it will end up calling
+  # the function we registered with the class.
+ area(x)
+</r:code>
+
+<r:test>
+source("RCircle.R"); source("classes.R")
+methods = list("area()" = function(this){cat("In area\n"); 10},
+               "scale(int)" = function(this, x) {cat("In scale(int)\n")},
+               "scale(int, int)" = function(this, x, y) { cat("In scale(int, int)\n"); 11})
+setDerivedClassMethods("RCircle", .methods = methods)
+getDerivedClassMethods("RCircle")
+
+setDerivedClassMethods("RCircle", "area()" = function(this){cat("In area\n"); 10}, "scale(int)" = NULL, .merge = FALSE)
+getDerivedClassMethods("RCircle")
+
+setDerivedClassMethods("RCircle", "area()" = function(this){cat("In area\n"); 10}, "scale(int)" = NULL, .merge = TRUE)
+getDerivedClassMethods("RCircle")
+
+
+ x = RCircle(1, 2, 3) 
+getDerivedClassMethods("RCircle")
+getDerivedClassMethods(x)
+
+ y = RCircle(1, 2, 3, list("draw" = function(this) {})) 
+getDerivedClassMethods(y)
+</r:test>
+
+</para>
+
+<para>
+Next, we see how we can use class-level methods and instance specific ones.
+As before, we set the class-level methods.
+<r:code>
+source("RCircle.R"); source("myCircle.R")
+methods = list("area()" = function(this){cat("In area\n"); 10},
+               "scale(int)" = function(this, x) {cat("In scale(int)\n")},
+               "scale(int, int)" = function(this, x, y) { cat("In scale(int, int)\n"); 11})
+
+.Call("R_RCircle_set_R_sharedClassMethods", methods)
+</r:code>
+Next, we create an instance and provide it with methods for 
+draw() and also for area(), and thus inherit the
+methods for the two scale() methods from the class-level methods.
+
+<r:code>
+ x = RCircle(1, 2, 3, list("draw()" = function(this){cat("instance-level draw method\n")},
+                           "area()" = function(this) {cat("instance-level area method\n")}))
+ area(x)
+</r:code>
+
+</para>
+</section>
+<para>
+This is a test whether we can access the protected fields
+if we explicitly cheat and make the R-level object appear
+as if it came from a protected method.
+<r:code id="fieldAccess">
+x = RCircle(1, 2, 3)
+attr(x, "C++Protected") = TRUE
+names(x)
+x[["x"]]
+x[["y"]]
+x[["radius"]]
+
+x[["radiu"]]
+</r:code>
+
+This is a similar version using direct access to the C routines
+from R before the [[ methods were generated.
+<r:code id="CFieldAccess">
+source("RCircle.R"); source("classes.R")
+ x = RCircle(1, 2, 3)
+# Error
+.Call("R__RCircle___R_radius_get", x)
+
+ # Explicitly make this protected using the  basic, insecure mechanism
+attr(x, "C++Protected") = TRUE
+.Call("R__RCircle___R_radius_get", x)
+</r:code>
+
+
+</para>
+
+<para>
+Here we test whether we can access protected
+elements of the base class.
+We call a protected method - myProtectedMethod
+<fix>Get myProtectedMethod as an R generic!</fix>
+and we also access the protected field - radius.
+<r:code>
+source("RCircle.R"); source("classes.R")
+.C("RDerivedClass_init")
+
+methods = list("area()" = function(this) {
+                  cat("In area\n") 
+                  .Call('R_RCircle_myProtectedMethod_p1RCircle', this)
+#XX  myProtectedMethod(this)
+                      # turn off all error handling so we don't get into recover
+                     old = options(); on.exit(options(old));  options(error = NULL)
+                      # Now try to access the protected radius field using x, not this
+                  try(print(x[["radius"]]))
+
+		  print(names(this))
+
+              
+                  pi * this[["radius"]]^2
+               })
+
+x = RCircle(1, 2, 3, methods)
+area(x)
+</r:code>
+
+</section>
+
+
+
+<section>
+<title>Profiling</title>
+<r:code>
+traceGen = 
+function() { 
+  stack = list()
+  list(trace = function() {
+                  stack[[length(stack)+1]] <<- lapply(sys.calls(), function(x) x)
+               },
+       stack = function() stack)
+}
+
+tracer = traceGen()
+trace(grep, tracer$trace, print = FALSE)
+tu$resolvedDefinitions = DefinitionContainer(tu, force = TRUE)
+resolved.methods = lapply(methods, resolveType, tu)
+
+callers = sapply(st, function(x) {e = x[[length(x)-7]][[1]]; if(is.name(e)) as.character(e) else deparse(e) })
+</r:code>
+</section>
+</article>

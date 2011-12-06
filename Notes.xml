@@ -1,0 +1,16 @@
+We don't need the default values to be the same in an S4 method and
+its generic, just the parameter names.
+
+setGeneric("foo", function(x, y = 1, z = 'abc') standardGeneric("foo"))
+[1] "foo"
+> setMethod("foo", c("character", "integer"), function(x, y, z = 'abc') { c(x, y, z) })
+[1] "foo"
+> setMethod("foo", c("numeric", "integer"), function(x, y, z = 10L) { c(x, y, z) })
+[1] "foo"
+ foo(3, 1L)
+
+
+But, defaults are problematic if not in the generic signature.
+
+setGeneric("z", function(a, b, c = 2) standardGeneric("z"))
+setMethod("z", c("integer"), function(a, b = 10, c = 20) c(a, b, c))

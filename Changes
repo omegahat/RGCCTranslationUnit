@@ -1,0 +1,52 @@
+0.6-0
+
+   *   Fix for real_cst converting the value to an integer.
+
+   *   Fox for string_cst including a space at the end of the string.
+
+   *   Changed the field name for string_cst from strg to string to be consistent
+       with identifier_node
+
+   *   getValue() doesn't quote the value for string_cst.
+
+
+0.5-1
+
+   *   namespace_decl nodes were being returned as objects of R class "GCCNode" rather than
+       "GCC::Node::namespace_decl" (due to a missing const in the definition of the
+        RTypeName() method).
+
+0.5-0
+
+   *   Documentation updates, class definitions and general cleanup 
+
+
+                                                                    April, '08
+   *   TranslationUnit.pm reports operator names correctly (note: operator name)
+
+   *   Added TUOptions() to control top-level options for the code generation.
+
+   *   Using objects to represent R functions (and C routines, methods)
+
+   *   constructorNamePrefix TU option for changing the name of all constructors, e.g.
+       to newC from just C so we can avoid conflicts with existing functions with a different
+       signature.
+
+Version 0.4-0                                                       December, 06
+
+   *  TranslationUnit.pm can handle output from gcc/g++ 4.1.0
+	* map accs to access
+	* map values of accs (priv, prot, pub) to private, protected, public
+	  to be consistent with the pre-4.1.0 output
+	* map note: value to value: 1 in the node.
+	* explicitly handle bases: <int> which was causing failure.
+	
+	* ngetClassNodes uses a different approach to find the class nodes. (Slower)
+   	* put "version" field in first (0-th) node.
+
+   *  function (getRegistrationInfo) to collect and compute the registration code 
+      for C/C++ routines referenced in R code.
+
+   *  getFields() returns the nodes and not the INDEX of each node.
+
+   

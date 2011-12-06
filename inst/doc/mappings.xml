@@ -1,0 +1,292 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="/Users/duncan/Projects/org/omegahat/Docs/XSL/Rstyle.xsl"?>
+<article
+         xmlns:c="http://www.C.org"
+         xmlns:s="http://cm.bell-labs.com/stat/S4"
+         xmlns:r="http://www.r-project.org"
+         xmlns:sh="http://www.shell.org"
+         xmlns:python="http://www.python.org"
+         xmlns:perl="http://www.perl.org"
+         xmlns:com="http://www.microsoft.com"
+         xmlns:omegahat="http://www.omegahat.org"
+         xmlns:omg="http://www.omegahat.org"
+         xmlns:vb="http://www.visualbasic.com"
+         xmlns:bioc="http://www.bioconductor.org"
+         xmlns:dcom="http://www.microsoft.com"
+         xmlns:java="http://www.java.com"
+         version="1.0"
+>
+
+<articleinfo>
+ <title>The Default RGCCTranslationUnit mappings.</title>
+ <authorgroup>
+  <author>
+    <firstname>Duncan</firstname>
+    <surname>Temple Lang</surname>
+    <affiliation><ulink url="http://www.stat.ucdavis.edu/~duncan">Department of Statistics, UC Davis</ulink></affiliation>
+  </author>
+ </authorgroup>
+ <date/>
+</articleinfo>
+
+<abstract><para>
+This article describes the current thinking underlying the default
+bindings created by the <omg:package>RGCCTranslationUnit</omg:package>
+for interfacing R to C/C++ code.
+</para></abstract>
+
+<section id="Constants">
+<title>Constants</title>
+<para>
+There are several types of constants in C/C++ code.  There are regular
+variables which have been declared with the
+<c:keyword>const</c:keyword> keyword.  There are values defined in
+enumerations, and for these there are named and anonymous
+enumerations.  There are also "literals" coming from #define
+directives in the pre-processor.
+</para>
+</section>
+
+<section>
+<title>Variables</title>
+<para>
+Variables are things that vary!, i.e. they are not constants.
+So we need to be able to get and set the current value of
+each variable.
+In C, we think of non-local/global variables which are
+available across files, i.e. non-static variables not within a
+routine.
+For C++, we also include static class variables.
+Fields within a C++ object behave like fields in a struct
+and are accessed directly. While they vary, they are not 
+top-level variables
+</para>
+</section>
+
+<section id="C Structures">
+<title> C Structures</title>
+<para>We create an interface
+to each C-level <c:keyword>struct</c:keyword>
+data type that we need or is explicitly created.
+We allow one to create new instances of these data types at
+the C-level from within R, specify finalizers which are called
+when the instance is no longer referenced in R,
+and to remove such finalizers<note><para>add these facilities</para></note>
+and to access individual fields within the structure.
+We also create an R-level class
+that mirrors the fields in the C-level structure
+and  we allow one to copy from C to R and from R to C
+using coercion methods, e.g <r:expr eval="false">as(x, target)</r:expr>
+
+</para>
+
+<section id="Constructors">
+<title>Constructors</title>
+<para>
+We create R functions and C routines for allocating instances of
+structs in C.  These are named <r:func>new_&lt;name&gt;</r:func>,
+where &lt;name&gt; is replaced by the actual name of the
+structure. <note><para>What precisely do we mean by name here - the A
+in struct A or the name in typedef in typedef struct _A { ... }
+A;</para></note>
+The constructor 
+</para>
+</section>
+
+<section id="Accessors">
+<title>Accessors</title>
+</section>
+
+<section id="Destructors">
+<title>Destructors</title>
+<para>
+One can create C-level instances of C-level
+<c:keyword>struct</c:keyword> objects via the generated
+<r:func>new_&lt;name&gt;</r:func> function.  <note><para>Do this for
+primitive data types and arrays thereof.</para></note> These are
+allocated on the heap and so must be released when we no longer need
+them in order to avoid memory leaks.  In such calls to constructor
+functions, one can specify whether to add a finalizer routine that
+will free the memory when the instance is no longer
+referenced/reachable from R (i.e. it can be garbaged collected in R's
+view).  To use the (programmatically generated) default finalizer
+routine, specify <r:true/> for the <r:arg>.finalizer</r:arg> argument
+of the constructor function in R.  Alternatively, if one wants to
+specify a different finalizer, one can use this
+<r:arg>.finalizer</r:arg> parameter to specify a
+<r:class>NativeSymbol</r:class> or <r:class>NativeSymbolInfo</r:class>
+identifying a native routine (which should expect a single argument -
+the external pointer object), or an R function which is also called
+with the external pointer as its sole argument(?).
+One can also chose to register a finalizer any time after the 
+creation of the C-level instance using the
+<r:func>addFinalizer</r:func> function
+in the <omg:pkg>RAutoGenRunTime</omg:pkg> package.
+At present, there is no mechanism in R to undo this,
+i.e. remove a registered finalizer.
+<note><para>Add such a routine to R.</para></note>
+</para>
+<para>
+There will be circumstances in which one cannot use R's garbage
+collection mechanism. For example, when an instance of a C-level structure 
+is inserted as a field into a containing C-level structure, we cannot
+release that initial object and have the reference from
+the container still be valid.  For cases like this, 
+the R programmer must manage the memory herself (or not!).
+Use the function <r:func>free</r:func> in the 
+<omg:pkg>RAutoGenRunTime</omg:pkg> to do this.
+
+</para>
+<note><para>Do we generate copy routines? We have all the work done as 
+we can copy from C to R, allocate a new object, and then from R to C again.
+But there is a quicker way that does this all in C.</para>
+</note>
+<note><para>
+Perhaps add something for weak references.
+</para></note>
+</section>
+
+</section>
+<section id="inout arguments">
+<title>Output Arguments</title>
+<para>
+Some routines have parameters that are used to transfer results to the
+caller.  This is how we can return multiple values from a C routine.
+We pass an object in by reference or as a pointer to a variable and
+the called routine can then populate its value and so convey an
+updated result to the caller.  These are out or inout variables
+depending on whetehr the called routine ignores the current content of
+the object or actually uses its value(s) as well as inserting values
+into it.
+</para>
+<para>
+When we create the interface to a function that 
+has "out" parameters <note><para>We need to extend this to inout parameters, but this is relatively easy.</para></note>
+we provide default arguments for these out parameters which are references
+to C-level structures of the appropriate type.
+These are passed to the C routine and then returned as part of the result
+with their contents changed.
+</para>
+<para>
+A <r:arg>.copy</r:arg> parameter is to the R function and this
+controls which of the out arguments are returned as part of the result
+and how. This is a named logical vector with as many elements as there
+are out parameters. The names are the names of the out parameters in
+the R function.  A value of <r:true/> corresponds to make a deep copy
+of the referenced C object to an instance of the corresponding R
+class.  A value of <r:false/> indicates that the result should be left
+as a reference. This is useful if we want to make further use of this
+object at the C level in subsequent R function calls.  Finally, a
+value of <r:na/> indicates that we are not interested in the result
+and that it should be ignored.  <note><para>This should be done at the
+C-level so as to avoid creating a reference to this object. But this
+is an efficiency issue, not a semantic one so can wait.</para></note>
+</para>
+<para>
+One can augment a resolved routine of class
+<r:class>ResolvedNativeRoutine</r:class> in R by adding a field named
+<r:field>paramStyle</r:field> to the list of values.  If no value is
+passed for the argument <r:arg>paramStyle</r:arg> in a call to
+<r:func>createMethodBinding</r:func> with this routine, that field is
+used to describe the parameter styles.
+Alternatively, one can explicitly specify these values in the call.
+Often, we create a set of "hints" and extract the specific parameter
+styles from that for the routine and add them to the call.
+<note><para>We should allow this to be done from the <r:arg>typeMap</r:arg> parameter.</para></note>
+</para>
+</section>
+
+<section>
+<title></title>
+</section>
+
+
+<section>
+<title>Casting</title>
+<para>
+For pointers to instances of C++ classes, one can coerce between
+types.  For example, suppose we have two classes A and B,
+and a third class C which extends B. 
+Then we have another class W which uses multiple inheritance to derive from both 
+A and C.
+Then, we can coerce from an instance of W, say <r:var>w</r:var> in R,
+to any of A, B or C
+<r:code>
+  as(w, "APtr")
+  as(w, "BPtr")
+  as(w, "CPtr")
+</r:code>
+This uses a static_cast call in the C++ code.  because W's ancestor
+classes - A, B and C - are known when we generate the bindings.
+We can use an explicit call to <r:func>cast</r:func>,
+such as
+<r:code>
+  cast(w, "APtr", how = 'dynamic')
+</r:code>
+This allows us to specify which of the cast techniques to use: static,
+dynamic, const and reinterpret.
+</para>
+
+<para>
+Remember that casting the C++ pointers may not lead to invoking
+methods in that class.  For example, suppose we have two classes X and
+Y, with Y derived from X.  And suppose X has a virtual method
+foo(int) that Y also implements.
+Then, when we call 
+<r:code>
+ foo(y, 1L)
+</r:code>
+we get Y's method.
+And if we coerce <r:var>y</r:var>
+to a reference/pointer to X, 
+<r:code>
+ foo(as(y, "XPtr"), 1L)
+</r:code>
+we still get Y's method. This is because C++ finds
+the virtual method and invokes that,
+as we would want.
+</para>
+<para>
+In order to invoke X's foo(int) method, we need to use the .inherited
+argument, e.g.
+<r:code>
+foo(y, 1L, .inherited = TRUE)
+foo(y, 1L, .inherited = "X")
+</r:code>
+The <r:true/> value invokes the method in the first base class.
+Alternatively, we can explicitly name any of the ancestor classes.
+</para>
+</section>
+
+<section>
+<title>RAutoGenRunTime package</title> 
+<para>The generated code uses R and C code that is quite
+general and not tied to the particular C/C++ code to which we are
+interfacing .  We could copy this code to each generated "package".
+And indeed this is fine.  However, it is better engineering to
+separate this code into its own package and have each programmatically
+generated interface use a shared version of this. This allows updates
+for the shared code to be readily installed and used without having to
+reinstall all the dependent packages.  The RAutoGenRunTime package
+provides these facilities.  For example, it provides the function that
+verifies the .copy argument for functions involving 'out' parameters.
+This is called directly from the generated code as
+RAutoGenRunTime:::validateCopy and is not exported (at present) as it
+is not intended to be called by regular users.
+</para>
+</section>
+
+
+<note>
+<para>There are two ways to compare the source attribute to a list of target files.
+Use isSourceFile to compare to a collection of actual file names (without their paths)
+and use checkSource when we have the name of the files of interest without their
+extension, e.g. foo which would match foo.c and foo.h.  This is not as specific.</para>
+</note>
+<note>
+<para>The class name for a reference to a struct is
+structNameRef. 
+The external pointer uses the same name as the class name.
+</para>
+</note>
+</article>

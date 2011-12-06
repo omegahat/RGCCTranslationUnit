@@ -1,0 +1,56 @@
+From struct.c
+
+The enum is a type_decl.
+  name and enumeral_type
+    enumeral_type has a 'name'
+       unql
+
+
+
+Conjectures
+  if the enumeral_type has a name, then it is a typedef
+
+  the enumeral_type without a name is just a simple enum.
+  But an enumeral_type without a name still has a typedef. (See enum.c)
+
+
+  We can end up with two type_decl's for a typedef enum?
+    One for the name and the other just for the enum by itself.
+
+
+  The chan field in a type_decl for an enum leads to the definition of each element.
+
+  The type_decl that terminates the enumeration has no name.
+
+
+   a const_decl whose type refers to an enumeral_type tells us this is an element of an enumeration.
+
+
+   We want the enumeration in the order it was defined (along with the values)
+   
+
+Consider the following example
+
+enum {X, Y = 2, Z = 4};
+typedef enum {red = 1, green, blue = 8}  PrimaryColor;
+
+
+We end up with a type_decl for the PrimaryColor.
+Its 'type' field points to an enumeral type and from
+that we know the 'min' and 'max', the 'csts' points
+to the tree_list giving the information about the elements
+and in order.
+ *  We don't need the const_decl's here as the elements are in the tree_list.
+
+The const_decl's do chain to find the type_decl that we don't need.
+
+[type_decl with name] ->  const_decl -> const_decl -> const_decl -> type_decl  |->  const_decl for next enum.
+
+From the type_decl field
+   read the type (enumeral_type) and then follow its csts.
+   Also follow the chan until we get to a type_decl. It has no name so quash that.
+
+What's the unql field?
+
+ Keep moving along the unql
+

@@ -1,0 +1,71 @@
+<todo>
+
+<issue>
+Find out about other node types and keys/attributes
+that we haven't observed.
+e.g. raises.
+</issue>
+
+<issue>
+Performance degrades as we do several parses sequentially.
+Need to handle memory better.
+But initial one is 3 faster than Perl version.
+And doesn't rely on RSPerl, so eases the installation.
+</issue>
+
+<issue>
+Who clears up the mess of strdup()s, etc. allocated during the parsing.
+</issue>
+
+<issue>
+Resolve the nodes that are referenced in another node so that we get
+the same effect as RSPerl parsing.
+</issue>
+
+<issue>
+ Support the fields that can have multiple entries.
+<br/>
+Have a class to support this, but not used yet.
+<br/>
+Put into a dupEntries hash table with a vector<const char *>
+entries.
+</issue>
+
+<issue>
+get R methods for the different parsers (Perl and C++)
+</issue>
+
+
+
+<done>
+
+<issue>
+Transform all the node reference values (@nnn) to integers.
+<br/>
+We have removed the @, but keep as strings since that is what is in
+the C++ hash_map.
+</issue>
+
+
+<issue>
+ fix the regular expressions to match correctly
+<br/>
+Okay now, isn't it?
+</issue>
+
+<issue>
+ Handle the last line and flushing any pending content in parseTU
+<br/>
+Fixed
+</issue>
+
+
+
+<issue>
+ fix the initialization of the regular expressions.
+<para/>
+Keep as pointers, but don't need to have within routine versions.
+Done.
+</issue>
+</done>
+</todo>

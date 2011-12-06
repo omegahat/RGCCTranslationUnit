@@ -1,0 +1,259 @@
+\documentclass{article}
+
+% See the paper in GccTranslationUnit_0.1-0.tar.gz on omegahat.org
+% This is in ../../../Python/Docs/
+
+\begin{document}
+\begin{abstract}
+
+  Scientific computing commonly involves accessing native code from
+  high-level languages. This paper presents an approach to automating
+  the integration and access of native (C and C++) code into
+  high-level languages such as R and Matlab.  The approach is
+  implemented in software that leverages the GNU compiler suite -- gcc
+  -- and, currently, Perl packages that can be used to both generate
+  bindings to one or more languages and also to generate data for
+  analyzing the source code.  In the simplest case, a user can apply
+  the software to a collection of C/C++ source files and generate an R
+  package containing S and C code to interface to the variables, data
+  structures, routines and classes within the original source.
+  For more complex code, a user can customize the generation of the
+  interface, limiting the routines of interest, managing the
+  conversion of data types to and from the C code, and controlling
+  memory management.
+  In either context, the generation of the interface code need only be
+  done once and can be reused by one or more users as a regular R
+  package.
+
+\keywords{source code analysis, reflectance, gccc compiler, meta-computing}
+\end{abstract}
+
+
+  The use of high-level languages such as R and Matlab has
+  had an enormous impact on the practice of statistics and data
+  analysis.  An important aspect of these languages is their ability
+  to intergrate native code written in C and Fortran. 
+  This permits   efficient computing by moving comutationally intensive tasks to 
+ the C code.  It also allows legacy code to be used rather than rewritten.
+  Perhaps, as importantly, the access to native code 
+  makes it feasible to incorporate software from other disciplines and
+  communities.  Access to legacy and 3rd-party code is very
+  important in scientific computing as we reuse well-tested components
+  to build  increasingly richer and more complex software systems.
+
+
+\section{User's Guide}
+
+The steps to using the package's functionality are
+as follows:
+\begin{itemize}
+\item Create a C++ file, say \file{foo.cpp},  containing the code of interest or 
+  that includes the header files containing the code of interest.
+\begin{verbatim}
+#include "wx/grid.h"
+\end{verbatim}
+
+\item Compile this file using the flags
+\begin{verbatim}
+ -c -fdump-translation-unit -o /dev/null 
+\end{verbatim}
+e.g.
+\begin{verbatim}
+g++  -c -fdump-translation-unit -o /dev/null  `wx-config --cflags` foo.cpp
+\end{verbatim}
+Here we add the flags needed for the wxWidgets code and these are
+computed from the shell command \verb+wx-config --cflags+.
+
+The result of this step is a file named \file{foo.cpp.tu}.
+
+\item Read the translation unit graph in this file into R via RSPerl
+and the GCC::TranslationUnit module.
+\begin{verbatim}
+library(RGCCTranslationUnit)
+foo = parseTU("foo.cpp.tu")
+\end{verbatim}
+Of course, you will specify the full path to the .tu file.
+
+\item Now, we can call the relevant functions in
+the R package to analyze and process the translation unit.
+For example, to generate R and C/C++ code to interface
+to the code in the original source code file, 
+\begin{verbatim}
+generateRInterface(foo)
+\end{verbatim}
+
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%
+
+\section{The Package}
+
+The package makes extensive use of the GCC::TranslationUnit module in
+Perl for reading the .tu files.  It also leverages the RSPerl package
+for making the Perl module accessible to the R environment.
+We use R to control the processing of the .tu
+file.  
+The function \SFunction{parseTU}
+causes control to pass from R to Perl and the GCC::TranslationModule
+to construct the array of nodes.
+This array and all the node elements remain in Perl
+and are not converted to R objects at this point.
+A reference to the array is returned to R and
+is typically assigned to an R variable for further processing.
+
+Given the array of nodes in R, we can chose what operations to
+apply to the nodes.
+
+
+\subsection{Resolving Entities}
+The translation unit graph contains all the information
+to understand the code, but it represents it at a low-level.
+The GCC::TranslationUnit module elevates the information slightly
+by gathering it into classes with methods appropriate for the type
+of node.
+However, to identify a routine in the code, it is necessary
+to combine the function declaration with the
+reference parameter declarations and return type,
+along with any qualifiers that control its scope and
+visibility.
+
+One of the important aspects in processing the graph
+is to resolve the definitions of the different data types.
+We need to ensure that this is done correctly,
+completely and does not get into infinite loops,
+e.g. when defining a structure data type that has an element
+which has the same type as the structure being defined
+as in a linked list such as
+\begin{verbatim}
+ struct _A {
+   struct _A *next;
+ };
+\end{verbatim}
+
+
+The function \SFunction{resolveType} takes a node and
+attempts to create an R description of that
+C/C++-level type.
+
+
+
+\subsection{The Classes}
+
+\subsection{The Functions}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Examples}
+
+\subsection{Building Interfaces}
+
+\subsection{Constructing the Registration Table for a Package}
+
+\subsection{Analyzing Source Code}
+
+
+\section{Current Limitations \& Future Work}
+
+\item Depends on an older version of gcc,
+i.e. not the most recently released version.
+It does however work with the 
+default compiler currently shipped with 
+Mac OS X.
+Also, while highly undersirable, it
+is possible for people to install a suitable
+version of gcc in their local accounts and use that
+solely to generate the TU files.
+Of course, this means mixing two different compilers
+and so the resulting view of the code may not be the same.
+These are the same arguments we had against using SWIG.
+
+Using 4.1.0 on myFun.cpp, the GCC::TranslationUnit 
+parser skips 3 lines of input, failing to parse some of the data.
+These are all binfo lines!
+Looking at the declarations
+\begin{verbatim}
+names(getAllDeclarations(z[[4]], "myFun"))
+\end{verbatim}
+suggests we also lose the definitions for
+\begin{verbatim}
+[1] "$_2" "_X"  "_A"  "$_1" "$_0"
+\end{verbatim}
+The \verb+_X+ and \verb+_A+ are ones we care about!
+
+
+I need to figure out whether the GCC developers are
+likely to add support for the relevant pieces as an ongoing effort.
+
+
+
+\item Speed of processing.
+
+\item GCC resolves typedefs to the actual data structure
+rather than reporting the reference to the alias.
+For example, in myFun.cpp, the second parameter for
+bar is an A, but is resolved to the struct _A definition.
+
+\item 
+This approach can be confused with complicated
+C/C++ code that uses pointers, casting, etc.
+However, given that we have the information about the bodies
+of the routines, we can do a lot more analysis
+to attempt to identify points of interest and
+potential difficulty.
+This will aid the developer creating an interface
+even if it does not actually completely automate the task.
+
+\item Pre-processor defines.
+We do not see the macros, etc. that are interpreted by the 
+pre-processor before the compiler is given the code.
+As a result, constructs such as
+\begin{verbatim}
+#define PI 3.1415
+\end{verbatim}
+are lost and we just see the constant repeated
+in a variety of places.
+We can identify this repetition as all references
+will identify the same node in the translation unit.
+However, we will not see the name 
+\verb+PI+ anywhere in the tree associated with this 
+constant value.
+
+This is a limitation, but it is not catastrophic. 
+We can use other tools such as SWIG or cscope to find these
+and merge the information from our tools
+with those of SWIG. 
+
+
+\item This only works for C and C++. It
+does not handle Fortran or Objective-C.
+Fortran is a problem. We might think about
+using f2c to get some understanding of the
+basic interface to Fortran.
+Objective-C has reflection in its own right
+and can be used dynamically.
+Languages such as Java can be dealt with in
+a similar manner, but requires very different 
+technology to implement this virtually identical
+facilities.
+The SJava  interface
+allows us to gather the reflection information 
+directly within R and hopefully some of the 
+code in this package can be used for that purpose.
+
+
+
+
+\section{See Also}
+RDCOMClient meta-code processor.
+
+HTMLForms.
+
+SSOAP and WSDL.
+
+
+
+
+
+\end{document}

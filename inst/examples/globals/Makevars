@@ -1,0 +1,2 @@
+AUTOGEN_DIR=$(OMEGA_HOME)/R/RAutoGenRunTime
+PKG_CPPFLAGS=-I$(AUTOGEN_DIR)/inst/include

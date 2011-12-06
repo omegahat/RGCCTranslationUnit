@@ -1,0 +1,343 @@
+\documentclass{article}
+\usepackage{fullpage}
+\usepackage{times}
+
+\begin{document}
+
+\section{C++}
+
+Consider the  example  code in myClass.cpp.
+
+We have a class `A', and another `B' that extends `A' and a second class
+`Other' via multiple inheritance.
+
+
+There are two types of interfaces we potentially need
+for an arbitrary native data structure, such as a struct.
+One is an ability to simply refer to it.
+And a second is to be able to copy it to and from R,
+field by field.
+For C++ classes, the state may not be directly representable
+via its fields alone. There may be some underlying, dynamic
+computations. So, in this case it makes more sense to focus
+on the reference approach.
+
+If possible, we want to avoid duplicating the class
+hierarchy and method dispatching in R so that it is
+done twice at run time with generic functions in R and
+virtual methods in C++.
+Rather
+
+To generate an R interface to these classes,
+we need to define a new class for this object.
+It should extend, either directly or indirectly, the base class
+\SClass{RC++Reference}. This is a simple class that
+contains an \SClass{externalptr} object by which we refer to the 
+native object.
+
+If the C++ class extends another C++ class, then we would like
+to have that information.
+
+
+For each class, we loop over each public method.
+We generate a C routine that mirrors
+the class method and takes an additional argument
+which is the class instance/object, i.e. the this.
+The C routine marshals the values from the
+R values to their equivalent versions in C/C++.
+It then calls the  class method.
+Then the result is converted to an R object
+and control returned to R.
+
+In addition to the C routine, we create an
+R function. This is a simple wrapper to the C
+routine and initially, it is responsible for
+checking the types of the arguments, 
+coercing them to the appropriate types
+and invoking the C routine.
+
+
+When the C++ routine is invoked, the
+C++ method dispatch system will 
+find the appropriate method within the
+class hierarchy.   Ideally, we do not want
+to mimic this on the R side.
+Suppose we have two classes, A and B where
+B extends A. Furthermore, suppose 
+A defines  virtual methods named foo
+and bar, and a non virtual method 
+fixed.
+We would therefore define
+an R  function and associated C routine
+for A::foo, A::bar and A::fixed.
+Let's say the R functions are named
+foo.A, foo.A and fixed.A
+(The similarity to S3 methods is coincidental
+at this part in the argument.)
+Do we need additional definitions for B?
+No. 
+A call to  foo.A
+with a reference to an instance of class B in C++
+\begin{verbatim}
+foo.A( myB)
+\end{verbatim}
+will end up with a call
+to the method  ref->foo()
+And the C++ virtual table/method lookup mechanism
+will find B's own version of that method or use
+that inherited from A.
+
+Before making the call to the C routine R_foo_A,
+the R code needs to verify that the myB object is
+indeed compatible with the underlying foo method
+for A. So it needs to verify that the reference is
+to an instance of A or a derived class, i.e. B.
+
+There are two approaches to this.
+One is to do this in R.
+The other is to leave this to C++.
+We will want both approaches to be available
+and depend on the underlying C++ library when 
+possible. For example, the wxWidgets library
+provides run-time checking and it is likely
+that it is best to leave it to that library.
+For C++ code that does not provide such checking,
+we can provide it ourselves in R.
+
+A simple approach is to use the S3 model
+of dynamic classes.
+Each object maintains a vector of class
+names. These are the class name of the instance
+and all the base class names, and all theirs, etc.
+These are computed statically when the interfaces are 
+generated and added to the R/C code that
+creates instances of the C++ classes.
+This is meta data and can be stored like the S4
+classes in R.
+Then, when validating the class of a reference instance 
+to see if it is compatible with the target class,
+we need only perform a calculation such as
+ "A" \%in\% classNames(b)
+
+
+\note{Merge across packages, libraries, etc. that extend the native classes.}
+
+See the RDCOM bindings mechanism also.
+
+
+
+The C++ and Java syntax for calling an object's method
+is familiar and convenient for many:  obj.foo(...)
+or obj->foo().
+In R, there is no corresponding
+"method in object" syntax.
+We introduced on in numerous packages over
+the years of the form
+  obj$foo(...)
+
+obj is an R object which extends a base class, say RC++Reference.
+Then, we define a method for the $ operator of that general class.  So
+obj$foo returns a function which can then be invoked as obj$foo(a, b,
+c) making the entire mechanism seem similar to the the Java/C++
+syntax.
+
+There are two ways for this to work with the generated bindings.
+One is to run an entirely generic function
+which has access to the original object and method name,
+i.e. obj and "foo" in our  example.
+The function takes an arbitrary number of arguments
+and when invoked, finds the relevant method
+based on obj, "foo", and the collection of arguments.
+This is perfectly acceptable, but delegates a lot of the work
+to run-time. The resolving of the method must be
+done when the intermediate function is invoked.
+
+
+When the method is not polymorphic, i.e. there is only one
+of them in the class of interest.
+In that case, it would be better to return that to the 
+user with information about the argument names.
+A user may interactively chose  to look at the resulting function
+and its arguments.
+
+At its simplest, if there was a collection of functions
+indexed by method name. For non-polymorphic methods,
+the entry in the table/list would be a function
+with well defined parameters that matched the corresponding
+C routine and C++ method.
+For polymorphic methods, there would be a table of R functions.
+The $ operator would return a function that had access
+to this table and which would restrict its search for
+the appropriate R function to this
+subset.
+
+One drawback to this approach is that we have to manage
+the collection of functions, and we have to merge
+them across base classes.
+We may end up consuming more memory, but
+we will need experiments to determine this.
+
+For example, in our myClass.h example,
+Top would have a table something like
+
+list(i = list(function(val) {}, 
+              function() {}),
+     ambiguity = list(function() {},
+                      function(x = 1) {},
+                      function(x = 21.9567) {}))
+
+Next would merge the table from Top 
+into its own table
+
+list(i = function(val) {},
+     upToDate = function() {})
+
+
+The resulting table would be
+
+list(i = list(function(val) {},  # from Next
+              function() {}),
+     ambiguity = list(function() {},
+                      function(x = 1) {},
+                      function(x = 21.9567) {}),
+     upToDate = function() {}    # From Next
+    )
+
+Then, obj$name extracts the element from
+this list.
+If it is a function, the operator function returns that.
+If it is a list, the call returns a new function
+that has access to this list of specific functions
+for that method name. The signature of the new function
+can be created by merging the parameters of the 
+functions in this list if that is meaningful,
+or alternatively default to ...
+
+
+How does Next's i method call Top's corresponding i method?
+Do we have to generate many C routines that implement this
+and then have a mechanism in R to access these.
+
+
+\section{Polymorphic Methods}
+
+C++, unlike C, allows methods or routines to
+be overloaded using different signatures.
+The return type is the same for all the different
+methods, and only the number and type of arguments
+change.
+
+One approach is to collect the different wrapper
+function definitions into a single list.
+Then, we make this available (as a local variable
+or via an environment) to a "generic" function that 
+takes care of dispatching to the correct function.
+
+
+
+One approach to creating this generic function is to use R's class
+mechanims.  The S3 dispatch is single-dispatch and so cannot be used
+to match multiple arguments.  We can use the S4 mechanism.  We have to
+explicitly define classes for each parameter type.  We also may want
+or need to determine which method to call dynamically. For example, S4
+cannot differentiate between int and int * and will have a single
+method for integer.  We can use S4 to get this far and then
+differentiate between the two competing functions at run time.
+
+However, this example also indicates that a user
+may need to be able to differentiate between the different
+overloaded functions.
+For example, given a scalar value, i.e. vector of length 1,
+she might want to call  foo(double *) rather than
+foo(double).
+We can make the individual, overloaded functions available
+directly, or indirectly via a call to the generic function.
+For instance, treating the generic
+function as a list that has these functions in its environment
+or as an attribute, we could have 
+   foo$`doublep`
+
+Similarly, if we have two C++ methods
+such as 
+ foo(double)
+and
+ foo(unsigned int)
+we cannot automatically differentiate between the two
+as both target types correspond to a  numeric
+scalar in R.
+
+What do references to a class map to in R types for the signature?
+
+
+
+An alternative approach is to build our own dispatch system.  This
+downside is that it may be slow and won't take advantage of
+improvements in the S4 mechanism.
+
+
+
+
+\section{Enumerations}
+These ideas are taken from the SWinTypeLibs and RDCOM approach.  The
+idea is that we define an R named integer vector, i.e. with named
+elements, that gives the mapping from the symbolic names to the actual
+values.  This is assigned to an R variable named
+\textit{type-name}Enum, e.g. ColorEnum.
+
+This is the R definition of the enumeration collection.  But we have
+individual values \footnote{Vectors of values later} which are derived
+from a basic class named EnumValue.  This is simply a named integer
+scalar.  For each new enumeration type, we define a new R class with
+that enumeration type's name, e.g. Color.  That class name identifies
+the corresponding enumeration definition in R. (This can be easily
+relaxed.)
+
+We also define methods for converting a character string and an
+integer to this type of object.  These perform the relevant checks to
+ensure that the value is valid relative to the enumeration definition.
+
+
+What about anonymous/unnamed enumerations?
+
+\section{Extending C++ class with R methods}
+Optionally, we can define a new C++ class that extends the original
+C++ class, say myClass, with a new on named, say R_myClass.  This
+extends myClass and also a fixed class named R_dynamicMethodClass.
+This latter class is a utility class that we use to manage a table of
+R functions which can be used to implement C++ methods for the newly
+derived class, i.e. R_myClass.
+
+
+
+\section{R_dynamicMethodClass}
+
+We have two of these classes.  The first one is used for cases where
+there are no polymorphic methods. Each element in the function table
+corresponds directly to a separately named method in the C++ class.
+When we look to see if there is an R function to implement a C++
+method, we need only look up that single name.
+
+When there are polymorphic methods, then we use a differently
+structured table.  Each element in that case is a list.  And the list
+is a collection of functions which are indexed by a name identifying
+the particular version of the polymorphic function.
+
+Precisely how we map the signature list to a string is not
+terrifically important from a technical perspective.  It is important
+that the R programmers can easily use the mapping when setting
+methods.  Using the Java notation for different types and classes is
+one approach, or explicit type names, or the number of arguments, etc.
+
+
+\begin{verbatim}
+class R_dynamicMethodClass {
+
+ protected:
+ 
+   /* A hash table for looking up R functions. */
+
+ 
+}
+\end{verbatim}
+
+\end{document}

@@ -1,0 +1,271 @@
+<?xml version="1.0"?>
+
+<article xmlns:cpp="http://www.cplusplus.org"
+         xmlns:r="http://www.r-project.org">
+
+<section>
+<title>
+</title>
+
+<section>
+<title>Current News</title>
+
+<para>
+We have generated the R and C++ class definitions
+and associated code for handling 
+
+</para>
+
+</section>
+
+<section>
+<title>STL</title>
+<para>
+Unfortunately, using the STL hash tables, we currently must have the
+same "base" type of value in each cell.  Ideally we would like to have
+strings and references to other nodes.  We can create a union for this
+or a wrapper class for each type.
+</para>
+
+<para>
+Also, asking for a non-existant entry/field in a GCCNode 
+causes it to be created within the hash table.
+And with our implementation, we get it twice.
+<r:code>
+<![CDATA[
+names(cpp[[6]])
+[1] "name" "type" "srcp" "chan" "args" "lang" "link" "body"
+> cpp[[6]][["INDEX"]]
+character(0)
+> names(cpp[[6]])
+ [1] "name"  "type"  "srcp"  "chan"  "args"  "lang"  "link"  "INDEX" "body" 
+[10] "INDEX"
+]]>
+</r:code>
+This is because we ask about it in the entries and then in the 
+duplicate entries hash_map containers and the lack of it in
+both causes it to be inserted into both.
+We could fix this by overriding the definition of []
+or by changing the routine that calls names()
+
+</para>
+</section>
+</section>
+
+<section>
+<title>Switching from Perl to C++ parser: GCCTUParserDynClass</title>
+<para>
+In getRoutines(), we need to find the first declaration and start from there.
+So we need a method for findFirstFileDecl for the input GCCTUParserDynClass.
+And we need to be able to determine whether the input is a
+parser or a declaration node. In other words, when do we invoke
+findFirstFileDecl.
+
+After that, we need a method for getParameters
+which is called from processFunction.
+</para>
+
+</section>
+
+<section>
+<para>
+To avoid using a hash table for each entry and avoid the contents
+being dynamic, we could explicitly declare C++ classes of different
+types and give specific fields for each.  This is a little tricky as
+we want to get the class hierarchy write of the C++ classes that we
+declare and also we need to know the names of the fields and their
+types for this to be useful.  The class hierarchy can be solved
+somewhat as we have already done it manually for Perl and can reuse
+that.  This approach would also mean that as the format of the GCC TU
+files change, i.e. extra fields, our code will break unless we give
+all the node classes the ability to handle additional entries.
+</para>
+<para>
+But let's first compile a table of names of fields within each
+node type.
+We start by parsing a large TU file.
+See the function <r:func>getFieldInfo</r:func> in classInfo.R
+<r:code>
+fieldInfo = getFieldInfo(c("~/wx.cpp.001t.tu", "~/qstackedwidget.cc.001t.tu"))
+</r:code>
+
+Given the field information, i.e. names for each type,
+we want to know what type each field typically has and if there
+is any deviation from that type.
+Each value is a string, but some strings start with a @ and are followed
+by values between 1 and the number of nodes in the TU indicating a node
+reference. Other values are strings (e.g. artificial,  operator ...)
+So we want to find these. So we establish a table for this
+indexed by class, then name, then type.
+See <r:func>getFieldTypeInfo</r:func> in classInfo.R
+</para>
+<para>
+So now we run this on two sizeable files
+<r:code>
+fieldTypeInfo = getFieldTypeInfo(c("~/wx.cpp.001t.tu", "~/qstackedwidget.cc.001t.tu"), fieldInfo)
+isConsistent = sapply(fieldTypeInfo, function(m) sum(m != 0) == nrow(m))
+</r:code>
+The <r:var>fieldTypes</r:var> variable is 
+a list with a matrix as the element for each node type.
+The matrix has as many rows as there are fields found for that node type
+and 3 columns. The columns have a count for how many instances of that
+field were node references, strings or a number.
+Ideally, all instances would be of a particular type - node, string or number.
+The <r:var>isConsistent</r:var> calculates whether this is true.
+The only node type that is not consistent is the identifier node
+and it has some (114) values which are numbers whereas the vast majority (34940) are 
+strings.  The number values correspond to identifier nodes of the form
+note: operator rather than string: value length: number.
+(Note that we ignore the length: field).
+So if we parse this properly, the value of the note: field would not be 
+the index but operator.
+
+</para>
+<para>
+The statement_list node is also quite different from the others.
+It has numbered entries which vary in count.
+This is really an array of node references.
+We can take a look at the distribution of the counts with
+<r:expr>fieldInfo[["GCC::Node::statement_list"]]</r:expr>.
+tree_vec also has numbered elements.
+We check the names of the elements of all the node types
+for which have numbers as names with
+<r:code>
+which(sapply(fieldInfo, function(x)  length(grep("^[0-9]+$", names(x))) > 0))
+</r:code>
+and this yields both statement_list and tree_vec and only those two.
+</para>
+<para>
+So 
+<r:code>
+sapply(fieldTypes, function(m) apply(m, 1, which.max))
+</r:code>
+tells us which type each field is.
+We should put labels on these numbers (i.e. make them a factor)
+to clarify that 1 is a node reference, 3 an integer and 2 a string.
+So now we can start thinking about defining the classes.
+Take for example the binfo type with the following information about its fields:
+<r:code>
+sapply(fieldTypes, function(m) apply(m, 1, which.max))[["GCC::Node::binfo"]]
+<r:output>
+ accs bases  binf  spec  type 
+    2     3     1     2     1 
+</r:output>
+</r:code>
+We would have an int for the bases element.
+We would have a string (char *) for each of accs and spec.
+And GCCNode pointers for both bases and type.
+We also define an unsigned integer for each of these node types
+which will be used to store the index of the node taken
+from the value of the field, with the @ stripped away.
+This is to deal with references to nodes we have not yet parsed
+and so cannot find the references.
+<cpp:code><![CDATA[
+class  binfo : public GCCNode
+{
+  protected:
+    int bases;
+    const char *accs;
+    const char *spec;
+    GCCNode *binf;
+    unsigned int binf_index;
+    GCCNode *type;
+    unsigned int type_index;
+
+  public: 
+     static const char *RClassName;
+     static GCCNode *createInstance() { return(new binfo);}
+
+  public:
+    binfo() :
+         bases(0), accs(0), spec(0), binf(0), binf_index(0), type(0), type_index(0)
+          {}
+
+  void pushEntry(std::string name, std::string val) {
+     if(name.compare("bases") == 0)
+         bases = toInteger(val);
+     else if(name.compare("accs"))
+         accs = val.c_str();
+     else if(name.compare("spec"))
+         spec = val.c_str();
+     else if(name.compare("binf")) 
+         binf = setNodeIndex(val, &binf_index);
+     else if(name.compare("type")) 
+         type = setNodeIndex(val, &type_index);
+
+     GCCNode::pushEntry(name, val);
+  }
+
+  SEXP getRElement(SEXP r_elName) {
+     const char *elName = CHAR(STRING_ELT(r_elName, 0));
+     if(strcmp(elName, "bases") == 0)
+         return(ScalarInteger(bases));
+     else if(strcmp(elName, "accs") == 0)
+         return(mkString(accs));
+     else if(strcmp(elName, "spec") == 0)
+          return(mkString(spec));
+     else if(strcmp(elName, "binf") == 0)
+          return(createGCCNodeRObject(binf));
+     else if(strcmp(elName, "type") == 0)
+          return(createGCCNodeRObject(type));
+
+     return(GCCNode::getRElement(r_elName));
+  }
+
+};
+]]></cpp:code>
+</para>
+<para>
+For OperandNodes, we need to add
+<cpp:code>
+	if(strncmp("op ", name.data(), 3) == 0)  {
+	    operands.push_back(strdup(val.data()));
+	}
+</cpp:code>
+in the pushEntry routine.
+</para>
+<para>
+
+So having tested this, we can go about our business of writing R code that
+generates this C++ code. (See createClasses.R and classFuncs.R in inst/TUParser/R/)
+
+
+</para>
+<para>
+The following verifies that there is a C++ and R class defined
+for each of the node types found in the TU file.
+This catches the node types that we haven't seen before.
+
+<r:code>
+classesForAllNodes =
+function(file)
+{
+  types = .Call("R_getNodeTypes", path.expand(file))
+  typeClasses = paste("GCC::Node::", names(types), sep = "")
+  i = match(typeClasses, getClasses(globalenv()))
+  if(any(is.na(i)))
+      types[is.na(i)]
+  else
+      character()
+}
+
+lapply(c("~/wx.cpp.001t.tu", "~/qstackedwidget.cc.001t.tu"), classesForAllNodes)
+
+
+
+qt.types = .Call("R_getNodeTypes", )
+typeClasses = paste("GCC::Node::", names(qt.types), sep = "")
+i = match(typeClasses, getClasses(globalenv()))
+
+if(any(is.na(i)))
+  names(qt.types[is.na(i)])
+</r:code>
+
+
+<r:code>
+types = .Call("R_getNodeTypes", path.expand(file))
+</r:code>
+</para>
+</section>
+
+</article>

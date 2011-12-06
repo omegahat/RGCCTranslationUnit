@@ -1,0 +1,14 @@
+
+x = new_timeval()
+as(as(x, "timeval"), "timevalPtr")$tv_sec == x$tv_sec
+
+x = new_rusage()
+names(x)
+as(x, "rusage")
+as(as(x, "rusage"), "rusagePtr") # Fails
+
+
+source("run.R")
+new_rusage(.finalizer = TRUE)
+# ! Wrong, but nobody can really tell and it doesn't do any harm!
+new_rusage(.finalizer = getNativeSymbolInfo("R_free_rlimitPtr_finalizer"))

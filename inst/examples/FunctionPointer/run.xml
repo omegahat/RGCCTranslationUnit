@@ -1,0 +1,266 @@
+<?xml version="1.0"?>
+
+<article xmlns:r="http://www.r-project.org"
+         xmlns:c="http://www.C.org"
+         xmlns:sh="http://www.shell.org"
+	 xmlns:omg="http://www.omegahat.org">
+<section>
+<title>Examples with Function Pointers</title>
+<para>
+
+The basic example is taken from the Examples/python/funcptr/ directory
+in the SWIG distribution.  We start with a simple C file, <ulink url="example.c"/>,
+that contains some simple routines that take two integer values and
+add, substract, multiply, etc.  There are two additional routines
+which have function pointers as additional parameter.  These two
+routines, do_op and do_op1, are called with two integers and also the
+C-level function/routine pointer, and do_op1 supports a
+user-specifiable <c:var>data</c:var>
+</para>
+
+<para>
+We first create the TU file via the command
+<sh:code>
+make tu
+</sh:code>
+This is a regular call to g++<footnote><para>We do not use gcc in spite of the fact that the code is regular C
+in order to get more information in the TU file</para></footnote>.
+Now we can read this into R and use its contents to generate the interface
+to the code we want.
+</para>
+
+<para>
+We load the package, read the TU file and find the routines in the
+file named "example" (which matches both example.h and example.c).  We
+then "resolve" these descriptions in order to make the information
+higher-level and localize, e.g.  gathering the function pointer
+description into a single, self-describing R object.
+
+<r:code id="make">
+library(RGCCTranslationUnit)
+tu = parseTU("example.c.001t.tu", lang = "C")
+r = getRoutines(tu, "example")
+rr = resolveType(r, tu)
+</r:code>
+</para>
+
+<para>
+We now have what we need to generate the R interface
+to this code.
+In this case, we don't want to generate code to the 
+routines <c:routine>add</c:routine>, <c:routine>sub</c:routine>, 
+<c:routine>mul</c:routine>. We could and it would do no harm at all, 
+but it just adds to the clutter. So we explicitly  identify the 
+two routines of interest, namely <c:routine>do_op</c:routine>
+and <c:routine>do_op1</c:routine>.
+We then create regular bindings for each of these and because
+we know they have function pointers within their parameters,
+we generate supporting routines for each of these function
+pointer types which allows us to use R functions in place
+of the C-level function/routines pointers.
+<r:code>
+toProxy = c("do_op", "do_op1")
+
+iface = lapply(rr[toProxy], 
+                function(x) RGCCTranslationUnit:::createMethodBinding(x, nodes = tu))
+
+
+funPtrHandlers = lapply(toProxy, 
+                         function(id) 
+                           RGCCTranslationUnit:::createCallbackProxy(rr[[id]]$parameters, id))
+</r:code>
+Finally, we combine the code for the two routines with
+the proxy function pointer support routines  into a single
+list and write the code to a C and an R file.
+<r:code><![CDATA[              
+iface = list(iface, unlist(funPtrHandlers))
+writeCode(iface, "native", file = "doop.c", 
+                   includes = c('"example.h"', "<RConverters.h>"))
+writeCode(iface, "r", file = "doop.R")
+]]></r:code>
+</para>
+</section>
+
+<section>
+<title>Building and Loading the code</title>
+<para>
+We can now compile and load the code into R.  We use the GNUmakefile
+in this directory to create the code and this amounts to a call to R
+CMD SHLIB.  Note that we are include the file(s) from RAutoGenRunTime
+within the library to avoid the need to link across packages.
+This is just a convenience in some respects.
+<sh:code>
+make
+</sh:code>
+</para>
+<para>
+Having done this successfully (?), i.e. without any error or warning messages,
+we can load the code into R.
+We load the run-time supporting package <omg:pkg>RAutoGenRunTime</omg:pkg>
+and then the shared library/DLL/DSO and the R code we created and wrote to doop.R
+<r:code id="run">
+library(RAutoGenRunTime)
+dyn.load("doop.so")
+source("doop.R")
+</r:code>
+And now we can use the code
+</para>
+
+</section>
+<section>
+<title>Using the code</title>
+
+<para>
+After all that, we can now utilize the two functions
+<r:func>do_op</r:func> and <r:func>do_op1</r:func>
+from within R.
+We can add and multiply using the following commands
+<r:code>
+do_op(2, 3, getNativeSymbolInfo("add"))
+do_op(2, 3, getNativeSymbolInfo("mul"))
+do_op(25, 102, "mul")
+</r:code>
+Wow, all that and we could have used <r:expr eval="false">2+3</r:expr>
+and <r:expr eval="false">2*3</r:expr>!
+But the concept is more significant.
+</para>
+<para>
+The function <r:func>do_op</r:func> is essentially the same as its C
+counterpart. It takes two integers and a function pointer. In the R
+world, we can access a C routine as a function pointer using
+<r:func>getNativeSymbolInfo</r:func> and using its
+<r:el>address</r:el> element.  This assumes the routine has been
+loaded as part of some DLL, e.g. using <r:func>dyn.load</r:func> or
+<r:func>library.dynam</r:func> or implicitly via
+<r:func>useDynLib</r:func> in a NAMESPACE file.  Note that we can give
+the name of the C routine as a string and the coercion of the R
+arguments will call <r:func>getNativeSymbolInfo</r:func> for us.  This
+is done via the <r:func
+pkg="RAutoGenRunTime">asFunctionPointer</r:func> function in the
+<omg:pkg>RAutoGenRunTime</omg:pkg> package.
+</para>
+
+<para>
+We next look at the <r:func>do_op1</r:func> function which is very
+similar.  But it is more flexible (at present) and certainly easier to
+understand (and explain!).  The difference between the two C routines
+is that <c:routine>do_op1</c:routine> allows the caller to supply an
+additional piece of data which is, in turn, passed in each call to the
+function pointer.  The function pointer routine can use that in
+whatever way it wants to parameterize its actions.  We use this for
+(amongst other potential uses) passing R function objects to the main
+routine, i.e. <c:routine>do_op1</c:routine>, and having our function
+pointer routine explicitly call that R function with the other
+arguments, i.e. the two integer values.
+</para>
+<para>
+The code we generate takes care of all these details for us.
+We can call <r:func>do_op1</r:func> in much the same way 
+as we did <r:func>do_op</r:func>, but in addition to being
+able to supply a C routine (by name or explicitly using <r:func>getNativeSymbolInfo</r:func>),
+we can pass an R function. It will be called with as many parameters
+as are in the C function pointer.
+We can provide a simple R function to perform the computations
+or we can explicitly access a routine as a native symbol
+and pass that, along with any (appropriate) user data.
+The first two calls are essentially equivalent as the
+second  is  essentially what the <r:func>do_op1</r:func> function does
+for use.
+<r:code>
+do_op1(2, 3, function(a, b) {cat("Here I am\n"); a ^ b})
+
+do_op1(2, 3, getNativeSymbolInfo("R_do_op1_proxy_callback")$address, 
+        function(a, b) {cat("Here I am\n"); a + b})
+</r:code>
+We can use other C-level function pointers as we did with
+<r:func>do_op</r:func>.
+Note that we have to explicitly specify the fourth parameter
+as <r:null/> (or whatever makes sense).
+<r:code>
+do_op1(2, 3, getNativeSymbolInfo("myCall"), NULL)
+do_op1(2, 3, "myCall", NULL)
+</r:code>
+<ignore>
+<r:code>
+.Call('R_do_op1', 1L, 2L, 
+        getNativeSymbolInfo("R_do_op1_proxy_callback")$address, 
+          function(a, b) {cat("Here I am\n"); a + b})
+</r:code>
+</ignore>
+</para>
+</section>
+<section>
+<title>Checking the Function Pointers</title>
+<para>
+The <r:func>asFunctionPointer</r:func> function will actually check
+the number of parameters in the R function to ensure that it is
+consistent with the C routine that will invoke it.  If there are too
+few parameters, it will raise an error.  If it has more parameters
+without default values than that of the C routine, it raises a
+warning.  Since R has lazy evaluation, such parameters may never be
+used and so this is not an error, but could potentially be one.
+To suppress this warning, one can pass the function as an "AsIs"
+object by enclosing it in a call to <r:func>I</r:func>.
+These are shown below
+<r:code>
+try(do_op1(2, 3, function(a) {cat("Here I am\n"); a ^ b}))
+
+do_op1(2, 3, function(a, b, c = 1) {cat("Here I am\n"); a ^ b})
+do_op1(2, 3, function(a, b, c) {cat("Here I am\n"); a ^ b})
+do_op1(2, 3, I(function(a, b, c) {cat("Here I am\n"); a ^ b}))
+</r:code>
+</para>
+<para>
+If a native symbol has been registered and we have information about
+the number of parameters it has, we test this also.  The registration
+mechanism in R was originally designed for routines accessed via the
+.C, .Call, .Fortran, .External interfaces.  It is not for general
+routines.  However, there may be some support for this now with the
+cross-package linking and we could also add it within the RAutoGenRunTime
+if we wanted.
+</para>
+<para>
+In addition to checking the number of parameters, we have information
+about the types of the C parameters.  If there is type information
+available on the R function, we can compare those.  Such type
+information can be provided via the <r:pkg>TypeInfo</r:pkg> package
+and also from S4 methods. If the function supplied was a generic
+(rather than a particular method), we could see if there was an S4
+method with the corresponding R signature.
+For example, suppose we define the trivial generic function
+<r:func>plus</r:func> and a method for two integers
+as follows.
+<r:code>
+setGeneric("plus", function(a, b) standardGeneric("plus"))
+setMethod("plus", c("integer", "integer"), function(a, b) a + b)
+</r:code>
+Then, we can use this in a call to <r:func>do_op1</r:func> as
+<r:code>
+do_op1(2, 3, plus)
+</r:code>
+and the appropriate method will be invoked.
+If there is no method defined for this signature,
+we will get a warning to this effect.
+For example,
+<r:code>
+asFunctionPointer(plus, 2, c("numeric", "numeric"))
+</r:code>
+would return the function but give the warning
+<r:warning>
+Warning message:
+In asFunctionPointer(plus, 2, c("numeric", "numeric")) :
+  there appears to be no method for the generic function 'plus' that matches the signature 'numeric', 'numeric'
+</r:warning>
+</para>
+
+<para>
+All of this testing may be unnecessarily expensive and so we can turn
+it off within individual calls using the <r:func>I</r:func> mechanism
+or explicitly passing <r:false/> for the <r:arg>test</r:arg>
+parameter. Alternatively, we can disable the action globally by
+setting the variable <r:var>TestFunctionPointer</r:var> in the
+<r:pkg>RAutoGenRunTime</r:pkg> package.
+
+</para>
+</section>
+</article>

@@ -1,0 +1,5 @@
+library(RGCCTranslationUnit)
+p = parseTU("../inst/examples/inheritance/main.cc.001t.tu")
+klasses = getClassNodes(p, "Classes")
+methods = lapply(klasses, getClassMethods)
+rmethods = lapply(methods, resolveType, p)

@@ -1,0 +1,19 @@
+globals.h & globals.c  the raw, initial code.
+
+globals.R      - R code for generating the interface
+
+test.R         - R code for testing the bindings.
+
+
+Automated Code 
+
+globalConstants.c - code for creating R file for constants. 
+
+Rglobals.c     - global variable accessors and valueOf routines.
+RglobalsCode.c - interface to the structure definitions and the use<var> routines.
+Rglobals.R     - R interface code
+
+Rglobals.h     - header file that includes globals.h & RConvertes.h
+                 and provides the declarations for the machine generated
+                 routines.
+

@@ -1,0 +1,495 @@
+<article>
+
+We start by creating the tu file.  In our case, we will just look at
+msa.h and all the files that it includes.
+<sh:code>
+make msa.c.tu
+</sh:code>
+(Note that this uses the older GNU compiler, 3.2 rather than
+than 4.0 series, or even 3.3 at present.
+And we also use the C++ compiler for more information in the tu dump.)
+<para/>
+
+From within R, we load the RGCCTranslationUnit
+package
+<r:code>
+library(RGCCTranslationUnit)
+</r:code>
+and parse the tu file with
+<r:code>
+p = parseTU("msa.c.tu")
+</r:code>
+
+<para/>
+
+Now that we have the parser reference, we can ask it to find
+all the routines
+<r:code>
+r = getRoutines(p, "msa")
+</r:code>
+And we can find their names with
+<r:code>
+names(r)
+</r:code>
+
+Note that we have filtered the routines by looking at
+only those whose source attribute is "msa.h".
+This discards the ones in the system headers and 
+any others in phast that are also included.
+If we want these, we can compute the local dependencies
+(again using the compiler) via
+<sh:code>
+make msa.d
+</sh:code>
+and then read these into R 
+with <r:func>readDependencies</r:func>.
+
+<para/>
+
+For the moment, we are interested in both the routines and also the
+data types that are defined.  Almost everything will flow from the
+routines.  While we may want to create an instance of a data type such
+as an MSA, we will only be able to make use of it if we can pass it to
+a routine or get it as the output from a routine.  As a result, we
+typically follow up on the routines and resolve the "weak"
+descriptions into complete objects that have completely specified
+types for the inputs and outputs. Before we do this, each routine in
+<r:var>r</r:var> is merely an identifier for the node that
+defines/declares the routine, but we have not pulled together the
+information about the parameters.  Rather, our node has a reference to
+all this information.
+
+We use resolveType to collect the information about a routine, or
+indeed any pertinent TU node.  We give it the node to be resolved, the
+parser/ entire collection of nodes in which to find the other
+referenced nodes, and optionally a container in which to put the
+results from resolving the intermediate nodes.  The latter allows us
+to resolve each node just once.  This gives us unique results for each
+node and also saves processing time.
+So, we create such a container with 
+<r:func>DefinitionContainer</r:func>
+and then process each routine node:
+<r:code>
+types = DefinitionContainer()
+rr = lapply(r, resolveType, p, types)
+</r:code>
+
+<para/>
+
+Let's look at the output.  The class of each resolved routine object
+is <r:class>ResolvedNativeRoutine</r:class>.
+These are dynamic, S3-style classes at present. 
+Each instance contains 
+<itemizedlist>
+<listitem>
+the index/identity of the original node of the routine declaration,
+</listitem>
+<listitem>
+the name of the routine
+</listitem>
+<listitem>
+a list of the parameters giving their names, if available,
+and types,
+</listitem>
+<listitem>
+the type of the return value
+</listitem>
+</itemizedlist>
+
+<para/>
+The parameter names can be a bit strange.
+If we work from the declarations in the header file, 
+the compiler does not use the parameter names.
+If we work from the actual source code that defines
+the C routines, then we get the names of the
+parameters as they are given in the definition of the routine.
+This is more natural, but it can be problematic.
+We want to compile the source code using the C++ compiler.
+C++ is essentially a superset of C, so this will typically work.
+However, there can be some problems. C++ is more strict,
+so it will require that certain casts are made explicit,
+e.g. 
+<c:code>
+  char *tmp = malloc(sizeof(char) * n)
+</c:code>
+would need to be changed to
+<cpp:code>
+  char *tmp = (char *) malloc(sizeof(char) * n)
+<cpp:/c:code>
+This is just good programming practice anyhow.
+
+<para/>
+C++ defines some reserved words such as new
+that cannot be used in C code to be compiled
+as C++.  Again, it is worthwhile to change these
+to, e.g., New or newValue.
+
+<para/>
+
+I find the stricter compilation of C++ can be helpful in that it
+identifies odd problems and makes one more certain that the code is
+doing the thing you thought it was.
+
+<para/>
+
+We make the tedious but minor changes to msa.c in the
+phast/src/lib/msa/ directory.  This amounts to changing 25 lines.
+Then we generate our tu file from that and we can use the same steps
+to parse the tu file and resolve the routines.  Then we have the
+parameter names.
+
+Note that the msa.c file does not necessarily contain the definitions
+of the same routines as those declared in the msa.h header file.  For
+example, the msa.c file contains two additional routines
+msa_reverse_data_segment, msa_new_coord_map which are not declared in
+msa.h.
+
+We can use either and it is preferrable to use the routine definitions
+rather than the declarations. If the logistics become too complex to
+organize finding the definitions, we can give up the parameter names.
+All the remaining information is the same.  If we are concerned about
+creating bindings to routines that are not in the "public API",
+i.e. the header files, we can always read the names of the routines
+from both and generate bindings only for those declared in the header
+file, but using the definitions taken from the actual source code. In
+other words, we can use the header file to identify which of the
+routines in the source code to process in our later steps.
+
+<para/>
+Given the resolved routines, we can proceed and generate bindings
+to them and the data structures they reference in their
+inputs and outputs.
+
+<para/>
+
+<section ID="DataTypes">
+<title>Data Types</title> In our msa.c or msa.h file, there is only
+one recursive data type defined, namely the MSA structure.  <fix/> At
+present, there is no simple function in R to find these definitions
+from the tu parser.  One would have to go through the nodes directly
+and this is slow.  We may add something to the package to do this.
+However, it is of low priority for the reasons that we mentioned
+earlier.  Specifically, we tend to only utilize such structures in the
+context of calling routines in the targer library, so we will
+encounter these data structures as we resolve the routines.  Indeed,
+having resolved the routines in our code above and stored the resolved
+types in the <r:var>types</r:var> variable, we can look in there for
+the definition of the MSA type.  This
+<r:class>DefinitionContainer</r:class> object is a simple environment
+in R which is used to hold the type for a resolved node.  We can ask
+for the names of all the types it knows about using
+<r:code>names(types)</r:code> and we can iterate over the elements to
+find the particular ones of interest, e.g structures, class
+definitions, enumeration definitions, and so on.
+<para/>
+In our case, we know that we are looking for the struct named MSA.  So
+we can reference it directly as
+<r:code>
+msa = types[["MSA"]]
+</r:code>
+It may appear strange that the class of this object is a
+<r:class>C++ClassDefinition</r:class>!  Unfortunately, since we
+generated the tu information using a C++ compiler, the entire R tu
+system thinks it is working with C++ code.
+To fix this, we use 
+<r:code>
+ p = setLanguage(p, "C")
+</r:code>
+to indicate what the target language is.
+<para/>
+
+Regardless of the R-level class of the MSA struct
+description, the key thing that this description
+contains is a list of the fields
+in the structure.
+We can see these with
+<r:code>
+names(msa@fields)
+</r:code>
+Each field is identified in the list by its name and each
+element in the list is the data type associated with field.
+<r:code>
+sapply(msa@fields, class)
+</r:code>
+This tells us nothing we cannot already determine from looking at the
+msa.h file ourselves, but of course, this is being done by software
+and does not require our involvement.
+
+
+Use createRFieldAccessors() to generate R and C/C++ code
+to both set and get the elements of structure given a reference
+to it.
+
+<r:code>
+msa_ss_struct = createRFieldAccessors(types$msa_ss_struct, get = FALSE)
+sapply(msa_ss_struct$cRoutines, cat, "\n\n")
+sapply(msa_ss_struct$rFunctions, cat, "\n\n")
+cat(msa_ss_struct$generic)
+</r:code>
+
+<para/>
+The basic data types are simple to think about in R.  int and unsigned
+int map naturally into R scalars. 
+<para/>
+The arrays such as int inv_alphabet[NCHARS] is resolved so that we
+know how many elements there are, i.e. 255, the value of NCHARS less
+1.  <note>We need to take into account that we are given one less than
+the declared value, indicating the maximum value.</note>
+<para/>
+ char * in C is typically a null-terminated string, but perhaps it is
+ not null-terminated but an array of characters.  In such cases, we
+ need to determine what variable/field tells us the number of elements
+ in this array.  The same is true for fields such as names and seqs,
+ and categories and is_informative.  These are arrays of strings and
+ integers and we need to be informed what the boundaries are. Because
+ of the flexibility in the C language, this is not something we can
+ determine from the header file. We can make inferences/guesses about
+ it from the source code by looking at loops that iterate over such
+ variables, allocations that are assigned to these variables, and so
+ on.  This is an interesting exercise and a useful thing to do.
+ However, it is convenient to allow the R user who is generating the
+ bindings to specify this information.  In our example, after looking at
+ the code, one might "guess" that the <c:field>nseqs</c:field> field is the
+ length for all four of these arrays.
+
+<para/>
+ But, in fact,  categories is allocated using the length field.
+ names and seqs are allocated using nseqs.
+ And so is is_informative.
+ Is ss a pointer to an instance of struct msa_ss_struct? or is 
+ it an array of such objects? Intuitively, we know it is the former, but can we infer 
+ this from code?
+
+ Since strcpy is called with alphabet as the destination, we know it is NULL-terminated.
+ Can we detect this?
+
+<para/>
+
+When we have a pointer to an array and do not copy it,
+we have this extend the R class "ExternalArray".
+Then we inherit the methods for [ and [[ to get one
+or more elements. 
+If we know how to compute the length of the 
+array, then we can add checks to the accessors.
+<para/>
+
+
+For MSA_SS, we have similar issues col_tuples, tuple_idx, counts and
+cat_counts are arrays.  By looking at the routine ss_new, we see where
+these fields are allocated.  The length of tuple_idx comes from
+msa->length, i.e. from the parent MSA object, or from its equivalent
+alloc_len in the MSA_SS object itself.  cat_counts s of length
+msa->ncats and each element within this array is itself array of
+length alloc_ntuples.  col_tuples and counts are also of length
+alloc_ntuples.
+
+The PooledMSA structure also has potential arrays.  pooled_msa and
+source_msas are pointers to structures, so not arrays.  The number of
+elements in lens is the same as the size of the list in source_msas.
+This is computed from lst_size(source_msas).
+And this is also the same length for the tuple_idx_map.
+
+We should note that it is all too common to have data structures like
+List in which the type of elements are really known to the author, but
+are technically dynamic and generic, i.e. void *.  Templates in C++
+are more suited for this.  But even in C, we can create
+simple aliases/typedefs to provide more of a clue about what
+type of elements a List contains.
+For example, we might have
+<c:code>
+typedef List List_MSA
+typedef List List_double
+</c:code>
+Now, if the code uses these typedefs, it allows us
+to associate routines with marshalling these 
+approrpriately in different contexts.
+
+
+<needsaddition/>
+
+What should the format of these "hints" be?  Essentially, we want to
+allow the user to assemble a collection of semi-permanent hints that
+can be used across different occassions that we process the C code.
+SWIG deal with this by defining a language with which users could
+specify/override certain rules.  One of the reasons for not using SWIG
+is that we already have a language and it seems more natural to
+express these rules in R<footnote>It would seem natural that SWIG
+would be embedded within each target language and users could create
+data structures or functions in that language to customize the
+processing.  This of course would be a lot more work than having a
+new, target-language-independent specification for these rules.  But,
+SWIG could bootstrap itself into these systems.  Of course, the rules
+would be tied to a language.  But the code generated by the rules need
+not be. So in fact, having language bindings for SWIG itself seems
+like a more appropriate, user-accessible model.</footnote>
+
+We need to be able to unambigously identify the C/C++ element
+of interest, i.e the routine, the struct definition,
+the class, etc. and so a simple name, e.g. MSA, might not be
+sufficient.
+
+We also need to be able to specify a different things for different
+types of C/C++ objects. For example, the variable giving the size of
+an array, who owns the memory for a value returned, what routine is
+used to free the memory associated with a data structure,
+which parameters are output parameters also.
+
+
+Can we infer these things.  In the routines for which we have the
+body, we can examine the code to see if we can make intelligent
+guesses about the answers to these types of questions.  The use of
+const in routines will be very helpful in determining whether an
+argument is modified.  The idea is that the user can provide this
+information, but we can try to acquire it programmatically if
+necessary.
+
+For example, when trying to find the routine that is used to free an
+MSA instance, we can look through the body of a routine to find any
+call to free with an MSA as the argument.
+
+We know that msa_free is the routine of interest.  And if we look at
+its definition node, we can find its body.  The body node is a
+scope_stmt which is followed/chained to a compound_stmt and a
+concluding scope_stmt.  The compound statement is the one in which we
+are interested and contains the actual expressions.
+We can use the nodeIterator function to loop over these
+and see if any of them have what we are looking for.
+We have a decl_stmt followed by a for_stmt and so on.
+Most of these are if statements
+The last expression is an expr_stmt and we look at
+the node in its expr field.
+This gives us a call_expr containing the function and the arguments.
+We look at the operand which gives us a (Perl) array
+with one element.
+This is a function_decl. We can call getNodeName()
+on this node and we get the value "free".
+Of course, if there macros or aliases, etc.
+we may need to do more work.
+And next we need to find out what the argument(s) is
+for this routine.
+
+
+r = getRoutines(p, "msa")
+fun = p[[ r$msa_free[["INDEX"]] ]]
+
+# Find the parameter types
+types = DefinitionContainer()
+parms = resolveType(fun, p, types)@parameters
+names(parms)
+
+
+b =fun$body(convert = FALSE) # function body
+b = b$body(convert = FALSE)  # compound stament
+b = b$chain(convert = FALSE) # get past the scope_stmt
+
+nodeIterator(b$body(convert = FALSE), # and another compound_stmt.
+               checkForFreeCall)
+
+The arguments are in the call_expr
+
+
+</section>
+
+<section ID="Enumerations">
+<title>Enumerations</title>
+<r:code>
+e = getEnumerations(pp, "msa")
+</r:code>
+
+<r:code>
+names(e)
+</r:code>
+
+We need to resolve the elements of this enumeration
+
+<r:code>
+def = resolveType(pp[[ e[1] ]], pp, types)
+</r:code>
+
+This gives the name-value pairs for all the elements and the name of
+the enumeration data type, if it exists.
+
+Unfortunately, we cannot get at symbolic constants that are defined
+via the pre-processor, i.e. via <c:code>#define NAME value</c:code> or
+command line flags -DNAME=value.  <note>If these are to be used in the
+R interface, we must find them using some other technique or they need
+to be converted to enumerations. The latter is a good idea for C/C++
+code anyway.</note> So values such as MSA_MAX_ORDER, NCHARS,
+MAX_LINE_LEN, GAP_CHAR are lost to us.  And the three related values
+STRIP_ALL_GAPS, STRIP_ANY_GAPS and NO_STRIP should be made into an
+enumeration.  <note>Change this in phast.</note>
+</section>
+
+
+<section ID="Other Files">
+<title>Other Files</title>
+
+We have focussed on the msa.c file.  In the process, we have also
+included other header files such as sufficient_stats.h and so on.  We
+can find the declared routines from those using getRoutines with the
+given file name as the filter and then process those.  Again, we have
+issues with parameter names in routines.  However, we can find the
+data types such as structs, enumerations, etc.  directly from this one
+tu parser for each of these files.  We resolve the routines that use
+these data types and then the resolved data types will be in our
+DefinitionContainer.  The routines of interest can be obtained via
+<r:func>getRoutines</r:func> and filtering on the file of interest.
+
+
+</section>
+
+<section ID="Finding Structs">
+<title>Finding Data Structures directly</title> We have found the
+definitions of data structure by focusing on routines and identifying
+the data structures they reference.  This is probably the most
+efficient way to approach things generally as these are the only data
+types in which we are really interested.  However, at times we might
+want to focus rapidly on particular data types that we know about and
+generate bindings to those. How can we do this?
+One possible approach is to find the first 
+type_decl and walk through the chain of these.
+
+Use getDataStructures does this and is provided in the package.
+
+
+<invisible>
+<r:code>
+library(RGCCTranslationUnit)
+tt = parseTU("mytest.c.tu")
+o = tt$getNext("GCC::Node::type_decl")
+
+filename = "mytest.h"
+tmp = o
+while(!is.null(tmp) && "chan" %in% names(tmp)) {
+  tmp = tmp$chain(convert = FALSE)
+  if(length(grep(filename, tmp$source())))
+     cat(tmp[["INDEX"]], "\n")
+}
+</r:code>
+
+Unfortunately, this type_decl elements are not chained in this manner
+so we cannot simply follow the links.
+
+Instead, we will have traverse the entire collection of nodes,
+identifying the ones of interest.
+
+
+
+p = parseTU("msa.c.tu")
+node = p$getFirst("GCC::Node::type_decl")
+
+nodes = 
+  nodeIterator(node, function(x) x, 
+                function(node) {
+                  cat(node[["INDEX"]], "source = ", node$source(), "\n")
+                  if(!RGCCTranslationUnit:::checkSource(node$source(), c("msa", "sufficient_stats")))
+                    return(NA)
+                  
+                  TRUE
+               })
+
+</invisible>
+
+</section>
+
+</article>

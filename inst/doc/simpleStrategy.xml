@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<article xmlns:r="http://www.r-project.org"
+  	 xmlns:sh="http://www.shell.org"
+  	 xmlns:s3="http://cm.bell-labs.com/stat/S3"
+         xmlns:cpp="http://www.cplusplus.org">
+
+<section>
+<title>The mechanism for simple, non-customized interface generation</title>
+<para>
+Here we present and explain the basic steps for creating an interface
+to some existing, simple C++ code.  We use the example in
+inst/examples/inherited with the C++ classes defined in Classes.h.
+We want to generate an interface to each of the classes
+and also to be able to implement corresponding derived classes for each
+of the defined C++ classes using R functions.
+</para>
+<para>
+The first step is of course to read the translation unit (TU),
+find the class nodes and all of the methods  for each of the classes
+and then resolve both of these to create an R-level description of the
+information.
+We also find and resolve any routines.
+</para>
+<para>
+While we have all the top-level routines and methods for all of the
+classes, we find which are overloaded and compute the definition for
+the generic function for each of these, i.e. what parameters they
+have.  When we are creating derived C++ classes for R-level
+implementation, all methods are considered overloaded, except static,
+class-level methods. Not all routines are overloaded.
+</para>
+<para>
+In addition to finding out which routines and methods are overloaded,
+we can compute the number of parameters needed to identify each
+overloaded method when we have them all together, so we compute this.
+As we create the R methods for the corresponding generic, we can use
+the same parameters as in the generic and specify the signature to
+identify the method dispatch for this particular method using the
+definition of the generic and the dispatch information we calculate
+here.
+</para>
+<para>
+In addition to the methods that we find in the class definitions, we
+also have to include information about the S4 methods that we will
+introduce when we create derived classes that have implementations of
+native methods with R functions.  To allow the invocation of inherited
+methods in the C++ classes, we introduce an additional parameter
+.inherited that identifies the particular inherited class whose method
+should be invoked (as a logical or class name string).  This adds an
+additional parameter and so must be compared with the other C++
+methods of the same name when determining the signatures of the
+different methods that uniquely identify them.
+
+</para>
+
+<para>
+Before doing the generic and method signature computations, we first
+compute all the class methods and the routines and then thin the
+former collection.  We look at all the classes and remove the virtual
+methods defined in the sub-classes that are actually inherited from an
+ancestor class.  For example, in our example foo(void) is defned (and
+implemented) in class C but this method is actually defined as virtual
+in class A and so appears in A, B and C.  Regardless of how we invoke
+this from R (i.e. from which R class we dispatch), the C++ class
+mechanism will find the appropriate method in our object depending on
+whether it is an instance of the C++ class A, B or C. So we might as
+well only define one method in R and that is for A in which the
+virtual method is actually defined.
+</para>
+<para>
+If we create "R derived classes" (i.e. potentially using R functions
+as C++ method implementations) then again a single S4 method for the
+class A (in R) will correctly dispatch for instances of R objects of
+class A, B, C, RA, RB and RC.  We also need a method that is specific
+to each of RA, RB and RC.
+<question>
+Could we get away with just one method that took the .inherited
+and figure out which was the most appropriate base class and passed that as a string to the
+C++ routine.
+</question>
+</para>
+<para>
+We use <r:func>computeOverloadedSignatures</r:func> to compute the
+definitions of the generics across all the methods and routines.
+By default, this returns a collection of <s3:class>RGenericDefinition</s3:class>
+objects which provide the signature of the generic, i.e. a character vector of the
+names. <fixme>Currently, there are no defaults.</fixme>
+After this, we can compute the number of parameters need to identify each
+method's signature using 
+</para>
+
+<r:test>
+gg = computeOverloadedSignatures(resolved.methods, routines, createGenerics = TRUE, addDots = FALSE)
+</r:test>
+</section>
+</article>

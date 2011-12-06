@@ -1,0 +1,30 @@
+In g++-4.1.0, the binfo nodes have a bases: 0 rather than base: @index.
+This causes the parser to issue a warning.
+
+Seems to be only this tag.
+  Fixed now with a patch to the TranslationUnit.pm (Dec 16th)
+
+gcc 4 seems to only provided the mangled names
+of the classes, etc. and not the generic versions.
+  Works for 4.1.0, at least.
+
+
+
+
+char is appearing as int.  need the print type to be computed rather
+than simply inferred from the name of the class.  The prec (ision)
+field is 8 for these and 32 for others.  This could get complicated to
+determine entirely accurately when we deal with 64 bit, Unicode,
+etc. depending on different compiler configurations, conventions, etc.
+
+  Implemented now in BuiltinType.
+
+
+
+Looking at lstat in stat.c.tu on the Mac, we end up with
+3 parameters for the routine. This number is the same as
+on Linux when using the type node for the function_decl
+and not the args node directly. The last of the parameters
+is a void.
+On Unix, we end up with 2 parameters by using the args
+node, and this gives the names of the parameters (e.g. __path).

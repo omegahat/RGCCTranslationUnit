@@ -1,0 +1,16 @@
+C,R,RTypeClass,Caccessor
+void,NULL,voidType,NA
+int,integer,intType,INTEGER
+bool,logical,boolType,INTEGER
+double,numeric,doubleType,REAL
+"long double",double,longDoubleType,REAL
+float,numeric,floatType,REAL
+char,character,charType,NA
+"short int",integer,shortIntType,INTEGER
+"short unsigned int",integer,shortUnsignedIntType,INTEGER
+"unsigned int",numeric,unsignedIntType,REAL
+"long int",numeric,longIntType,REAL
+"long long",numeric,longLongType,REAL
+"long unsigned int",numeric,longUnsignedIntType,REAL
+"long long unsigned int",numeric,longLongUnsignedIntType,REAL
+"unsigned char",raw,unsignedCharType,RAW

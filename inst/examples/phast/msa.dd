@@ -1,0 +1,7 @@
+msa.o: msa.c ../phast/include/msa.h ../phast/include/gff.h \
+  ../phast/include/stringsplus.h ../phast/include/lists.h \
+  ../phast/include/category_map.h ../phast/include/hmm.h \
+  ../phast/include/matrix.h ../phast/include/vector.h \
+  ../phast/include/markov_matrix.h ../phast/include/complex_matrix.h \
+  ../phast/include/complex.h ../phast/include/complex_vector.h \
+  ../phast/include/misc.h

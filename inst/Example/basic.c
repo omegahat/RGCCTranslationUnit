@@ -1,0 +1,2 @@
+int basic(int);
+

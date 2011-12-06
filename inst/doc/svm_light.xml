@@ -1,0 +1,173 @@
+
+<article xmlns:r="http://www.r-project.org">
+
+<section>
+<title>
+</title>
+<para>
+We start by reading  the TU.
+<r:code>
+svm.tu = parseTU("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/Example/svm_light.c.001t.tu", lang = "C")
+</r:code>
+Next, we look at the pre-processor definitions.
+The following code 
+(adapted to where the files are on your machine)
+does the job:
+<r:code>
+defs = getCppDefines("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/Example/svm_light.c", "-I/home/duncan/SVM_light", 
+                      sysIncludes = c("stdlib.h", "stdio.h", "ctype.h", "math.h", "string.h", "time.h", "float.h"))
+defs = processDefines(defs, tu = svm.tu, files = c("svm_common", "svm_learn"))
+<r:output>
+$macros
+    REGRESSION        SIGMOID   OPTIMIZATION            RBF        VERSION 
+           "2"            "3"            "4"            "2"    "\"V6.01\"" 
+        LINEAR      MAXSHRINK   VERSION_DATE           POLY CLASSIFICATION 
+           "0"        "50000" "\"01.09.04\""            "1"            "1" 
+       RANKING     MAXFEATNUM 
+           "3"     "99999999" 
+
+$flagDefines
+named character(0)
+
+$ignored
+named character(0)
+</r:output>
+</r:code>
+The output shows that there are several numeric values and some of
+them look as if they should be enumerations for specifying one of a
+set of possible values, e.g. LINEAR, POLY, RBF, SIGMOID and
+CLASSIFICATION, REGRESSION, RANKING, OPTIMIZATION.  If the authors
+used enumerations, the interface would be clearer and more robust.
+
+Next, we get the global variables nodes
+<r:code>
+gvars = getGlobalVariables(svm.tu, c("svm_common.h", "svm_learn.h"))
+</r:code>
+
+The constant variables are found with
+<r:code>
+consts = computeGlobalConstants(svm.tu, files = c("svm_common.h", "svm_learn.h"))
+</r:code>
+From this, we see that there no constants.
+But from <r:var>gvars</r:var>, there are two "dynamic" variables,
+i.e. variables whose contents can change!
+These are
+<r:code>
+names(gvars)
+<r:output>
+[1] "kernel_cache_statistic" "verbosity"             
+</r:output>
+</r:code>
+By resolving these nodes and looking at the resulting types, we see
+that both are long integers (i.e. <c:keyword>long</c:keyword>):
+<r:code>
+tt = resolveType(gvars, svm.tu)
+sapply(tt, function(x) x@type@name)
+<r:output>
+kernel_cache_statistic              verbosity 
+            "long int"             "long int" 
+</r:output>
+</r:code>
+
+
+
+
+<r:code>
+globalConstants = computeGlobalConstants(svm.tu, gvars)
+</r:code>
+
+<r:code>
+enums = getEnumerations(svm.tu, c("svm_common", "svm_learn"))
+enumDefs = resolveType(enums, svm.tu)
+</r:code>
+
+</para>
+</section>
+
+<section>
+<title>Data Structures</title>
+<para>
+We get the data structures defined
+<r:code>
+ds = getDataStructures(svm.tu, c("svm_common.h", "svm_learn.h"), includeMissingSource = FALSE)
+</r:code>
+
+We bring all the information together for each type
+with
+<r:code>
+svm.types = resolveType(ds, svm.tu)
+</r:code>
+</para>
+
+<para>
+Let's look the <c:type>MODEL</c:type> 
+<c:keyword>struct</c:keyword>.
+<r:code>
+names(svm.types[["MODEL"]]@fields)
+<r:output>
+ [1] "sv_num"         "at_upper_bound" "b"              "supvec"        
+ [5] "alpha"          "index"          "totwords"       "totdoc"        
+ [9] "kernel_parm"    "loo_error"      "loo_recall"     "loo_precision" 
+[13] "xa_error"       "xa_recall"      "xa_precision"   "lin_weights"   
+[17] "maxdiff"       
+</r:output>
+</r:code>
+By looking at this in the header file, we could see more easily that 
+one of the first two fields, sv_num and at_upper_bound, are
+likely to be related to the length of the arrays in subsequent fields.
+If we look at the code in the <file>svm_common.c</file> file, we 
+confirm this by looking in the first routine, <c:routine>classify_example</c:routine>.
+The first parameter is a MODEL and there is a loop going from
+1 to sv_num and the body of the loop references
+supvec and alpha by the loop index.
+So this tells us that we should think about starting at 
+position 1 and suggests that the extent of supvec and alpha 
+is given by sv_num.
+</para>
+
+<para>
+How might we go about determining this programmatically.
+First, let's create the TU for the source code and not just the header.
+<sh:code>
+g++ -c -fdump-translation-unit -I/home/duncan/SVM_light -o /dev/null ~/SVM_light/svm_common.c 
+</sh:code>
+Then, we read this into R and fetch the routines.
+<r:code>
+svm_common.tu = parseTU("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/Example/svm_common.c.001t.tu")
+routines = getRoutines(svm_common.tu, "svm_common.c")
+rr = resolveType(routines, svm_common.tu)
+</r:code>
+
+Now, let's find a routine that takes a MODEL as an input,
+either directly or via a pointer
+<r:code>
+w = sapply(rr,
+       function(x) 
+          any(sapply(x$parameters, 
+                     function(t) {
+             t = t$type
+             if(is(t, "StructDefinition") && t@name == "MODEL") 
+                 return(TRUE)
+             if( is(t, "PointerType")) {
+	         if(is(t@type, "ResolvedTypeReference")) #XXX
+                   t@type = resolveType(t@type)
+                 return((is(t@type, "C++ClassDefinition") || is(t@type, "StructDefinition")) && t@type@name == "MODEL")
+             }  else
+                 FALSE
+             })))
+</r:code>
+
+<r:code>
+routines[which(w)[1]]
+</r:code>
+
+
+To get information about the bodies of the routines, we use
+<sh:code>
+g++ -c -fdump-tree-original-raw -I/home/duncan/SVM_light -o /dev/null ~/SVM_light/svm_common.c 
+</sh:code>
+to generate the TU which creates a file named <file>svm_common.c.003t.original</file>.
+
+
+</section>
+</article>

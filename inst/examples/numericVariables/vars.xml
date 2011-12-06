@@ -1,0 +1,912 @@
+<article   xmlns:r="http://www.r-project.org"
+	   xmlns:c="http://www.C.org"
+	   xmlns:make="http://www.make.org"
+	   xmlns:omg="http://www.omegahat.org"
+	   xmlns:sh="http://www.shell.org">
+
+<section>
+<title></title>
+<para>
+This example deals with global variables and also the different
+primitive types and arrays of primitive and struct types.  It allows
+us to test how we generate the code for these types
+and illustrate the resulting interface. 
+The code is in <ulink url="vars.c"/> and 
+the variables and types are defined in <ulink url="vars.h"/>.
+As you can see from the code, these are quite simple and are intended to cover the
+different types.
+</para>
+<para>
+We generate the  tu file using the shell command
+<sh:code>
+make tu
+</sh:code>
+This creates <ulink url="vars.c.001t.tu"/>
+which we then read into R via <r:func>parseTU</r:func>.
+<r:code id="iface">
+library(RGCCTranslationUnit)
+tu = parseTU("vars.c.001t.tu", language = "C")
+</r:code>
+We can pass this directly to <r:func>generateInterface</r:func>
+and have it generate all the code to access the variables
+in the translation unit.
+We indicate in the call where to write the code and the include/header
+file needed by that generated code:
+<r:code>
+iface = generateInterface(tu, outfile = "Rvars", files = c("vars", "twod"),
+                               includes = c('"vars.h"'))
+</r:code>
+(Note that because the code is in two different files (vars.c and twod.c),
+we need to specify both as we are filtering the variables, routines, etc. based on the file name
+so as to avoid symbols from the system and compiler files.)
+This creates both <file>Rvars.R</file> and <file>Rvars.c</file>.
+We compile the code by calling <sh:expr>make</sh:expr>
+with no arguments and this compiles the vars.c, Rvars.c and RConverters.c
+files into a DLL/DSO.
+At this point, we can use this code in an R session as discussed in the next
+section.
+</para>
+
+<para>
+We can fetch the collection of global variables ourselves if we want
+to look at them directly using
+<r:code>
+g = getGlobalVariables(tu, "vars", resolve = TRUE)
+names(g)
+<r:output>
+ [1] "xarray"  "fixed"   "uc"      "ld"      "ulli"    "ap"      "a"      
+ [8] "usarray" "uarray"  "array"   "us"      "ll"      "ul"      "l"      
+[15] "s"       "i"       "d"       "ui"     
+</r:output>
+</r:code>
+This call not only finds the variables, but resolves their types also.
+</para>
+</section>
+
+
+<section>
+<title>Using the Code</title>
+<para>
+First we need to load the DLL/DSO into R and 
+also bring the R code into the session. 
+<r:code>
+source("Rvars.R") ; dyn.load("Rvars.so")
+</r:code>
+
+After this, we can see what we have 
+<r:code>
+objects()
+<r:output>
+ [1] "a"                        "ap"                      
+ [3] "APtr_get_i"               "APtr_get_uarray"         
+ [5] "APtr_set_i"               "APtr_set_uarray"         
+ [7] "array"                    "d"                       
+ [9] "get_a"                    "get_ap"                  
+[11] "get_array"                "getIntArray"             
+[13] "getShortUnsignedIntArray" "get_uarray"              
+[15] "getUnsignedIntArray"      "get_usarray"             
+[17] "get_xarray"               "getXArray"               
+[19] "i"                        "l"                       
+[21] "ld"                       "ll"                      
+[23] "new_A"                    "new_X"                   
+[25] "s"                        "Source"                  
+[27] "uarray"                   "uc"                      
+[29] "ui"                       "ul"                      
+[31] "ulli"                     "us"                      
+[33] "usarray"                  "xarray"                  
+[35] "XPtr_get_a"               "XPtr_get_b"              
+[37] "XPtr_set_a"               "XPtr_set_b"              
+</r:output>
+</r:code>
+We end up with about 40 (38 at present) R variables.
+Some of these are functions and some are the variables that
+give us access to the corresponding C variables.
+We can get a better overview and separate the variables and functions using
+<r:code>
+tt = sapply(objects(), function(x) class(get(x)))
+split(names(tt), tt)
+<r:output>
+$A
+[1] "a"
+
+$APtr
+[1] "ap"
+
+$`function`
+ [1] "APtr_get_i"               "APtr_get_uarray"         
+ [3] "APtr_set_i"               "APtr_set_uarray"         
+ [5] "get_a"                    "get_ap"                  
+ [7] "get_array"                "getIntArray"             
+ [9] "getShortUnsignedIntArray" "get_uarray"              
+[11] "getUnsignedIntArray"      "get_usarray"             
+[13] "get_xarray"               "getXArray"               
+[15] "new_A"                    "new_X"                   
+[17] "Source"                   "XPtr_get_a"              
+[19] "XPtr_get_b"               "XPtr_set_a"              
+[21] "XPtr_set_b"              
+
+$integer
+[1] "array"   "i"       "ll"      "s"       "ui"      "us"      "usarray"
+
+$list
+[1] "xarray"
+
+$numeric
+[1] "d"      "l"      "ld"     "uarray" "ul"     "ulli"  
+
+$raw
+[1] "uc"
+</r:output>
+</r:code>
+If this code were in a package, we might chose to not export
+some functions such as <r:func>APtr_set_i</r:func> and <r:func>XPtr_get_b</r:func>
+which are accessors for struct elements for references to struct instances.
+These are used by the <r:operator>$</r:operator> methods we defined for those new types.
+And indeed we can find the newly defined classes with
+<r:code>
+getClasses(globalenv())
+<r:output>
+[1] "A"                     "APtr"                  "intArray"             
+[4] "shortUnsignedIntArray" "unsignedIntArray"      "X"                    
+[7] "XArray"                "XPtr"                 
+</r:output>
+</r:code>
+</para>
+
+<para>
+Okay, so now we have looked around and got the big picture, but
+we want to access the values of the variables in C.
+For the most part, this is very straightforward and you do what you
+would do with regular R variables - just give the name of the variable at the
+R prompt.
+<r:code>
+d
+i
+ll
+s
+ui
+us
+usarray
+array
+</r:code>
+
+We can get all the values (ignoring the functions) should we want, with
+<r:code>
+sapply(objects(), function(x) { x = get(x); if(!is.function(x)) x})
+</r:code>
+
+</para>
+<para>
+We can change the value of any of the variables using straightforward assignment
+<r:code>
+d = 2
+d
+i = 1
+i
+</r:code>
+We can assign values to arrays also, e.g.,
+<r:code>
+array = array + 100L
+array = array + 100
+</r:code>
+The difference between using 100L and 100 in the two commands
+illustrates  the coercion of the value on the right hand side of the assignment
+to the appropriate type for the C variable is done for us.
+We can assign using subsets on the left hand side
+as in
+<r:code>
+array[1:3] = 3:1
+</r:code>
+This actually changes the C-level array.
+</para>
+
+<para>
+Now since this is an array in C, it has a fixed length.
+If we try to assign a value to it that does not have the same number of elements,
+the assignment code will "fix" things for us!
+Let's assign a smaller vector to <r:var>array</r:var> and see what the resulting contents of 
+<r:var>array</r:var> are?
+For instance,
+<r:code>
+array = c(100, 101, 102)
+array
+<r:output>
+[1] 100 101 102  NA  NA  NA  NA  NA  NA  NA 
+</r:output>
+</r:code>
+shows that the shorter vector was extended to be of the appropriate length.
+We also got a warning message 
+<r:warning>
+Warning message:
+expecting an object of length  10 , got object with length  3 
+</r:warning>
+which indicates the problem, but continues.
+<note><para>We could use the recycling rule to repeat the elements.</para></note>
+</para>
+<para>
+If we assign a value which has more elements than the C array, 
+the extra elements are discarded:
+<r:code>
+array = 20:1
+array
+<r:output>
+ [1] 20 19 18 17 16 15 14 13 12 11
+</r:output>
+</r:code>
+Again, a warning message is issued.
+</para>
+<para>
+In the case where the value being assigned to an array does not have the
+correct dimensions, a warning (or error) is raised and it has a class
+"ArrayLengthWarning" (or "ArrayLengthError") and builds on the simpleWarning and simpleError
+conditions. These can therefor be handled explicitly in a <r:func>tryCatch</r:func> call.
+For instance,
+<r:code><![CDATA[
+array = 1:6
+tryCatch(array <- 1:3, ArrayLengthWarning = function(e, ...) {cat("got it\n")})
+]]></r:code>
+</para>
+<para>
+If we try to assign values that are not compatible
+with the elements of the array, we get an error.
+For example, let's try to assign negative values to the
+<c:type>unsigned int</c:type> array <r:var>uarray</r:var>:
+<r:code>
+uarray = -(1:8)
+uarray = c(1:9, -1)
+</r:code>
+Both fail!
+</para>
+
+
+<para>
+All of these are regular R objects.  The scalar values in C are
+vectors of length 1.  The arrays in C are vectors in R.  The unsigned
+int and unsigned long types are numeric vectors since the value will
+not reliably fit into a regular integer used by R.
+The struct object in C named <c:var>a</c:var> is an object of 
+class <r:s4class>A</r:s4class> in R:
+<r:code>
+class(a)
+</r:code>
+This has slots corresponding to the fields of the struct in C:
+<r:code>
+slotNames(a)
+<r:output>
+[1] "i"      "uarray"
+</r:output>
+</r:code>
+Since this is a regular R object, we can get and set the slots as usual.
+Note that this value as we have used it so far is a copy of the contents
+of the underlying C object.
+Each time we access the value of <r:var>a</r:var> in R, 
+we go to the C object and get its current contents.
+However, if we modify the resulting object, the values are not 
+propogated to the C variable.
+We illustrate this with some code
+<r:code>
+a
+x = a
+x@i == a@i  # TRUE
+x@i = 1L
+x@i == a@i  # FALSE
+</r:code>
+If we wanted to treat the C value as a reference and not copy its contents,
+we can do this. We'll talk more about this below.
+</para>
+<r:test>
+a@i = 4L # fails at present!
+</r:test>
+
+<para>
+Before we get to references to C values generally, we'll look at
+a specific example. One of our global variables, <c:var>ap</c:var>, is actually a
+C pointer/reference to a struct A and we have it set to point to 
+the C variable <c:var>a</c:var>. 
+The resulting object in R is <r:var>ap</r:var> (the same name)
+and is of class <r:s4class>APtr</r:s4class> in R.
+This is an opaque type in R that holds a reference to the external C
+variable.  We have defined methods for this class for
+<r:func>names</r:func>, <r:operator>$</r:operator>,
+<r:operator>$&lt;-</r:operator> to be able to access the fields in the
+underlying C instance.
+With these, we can treat <r:var>ap</r:var> as a regular R list - almost!
+The usual accessors work just fine
+<r:code>
+names(ap)
+ap$i
+ap$uarray
+</r:code>
+We can even set the values
+<r:code>
+ap$i = 10
+ap$uarray = c(10, 20, 30) 
+</r:code>
+and verify that the values have been updated in the resulting
+object
+<r:code>
+ap$i
+ap$uarray
+</r:code>
+</para>
+
+<para>
+But now lets assign a  vector to uarray:
+<r:test>
+ap$uarray = 1:10
+Warning message:
+expecting an object of length  3 , got object with length  10 
+</r:test>
+The problem is that this is not an arbitrary R list
+but a very structured C object. The fields i and
+uarray are an int and array of 3 unsigned int values
+respectively. Any assignments to those must be 
+compatible with those types and will be coerced to be so.
+When we assign a vector of length 10, it is truncated to be
+the same length as exected by uarray.
+We can try to assign  strings to i as
+<r:code>
+ap$i = "bob"
+ap$i = "10"
+</r:code>
+Both "succeed", but the first induces a <r:na/>
+as "bob" cannot be converted to an integer which happens
+implicitly in the interface code.
+</para>
+<para>
+We'll briefly return now to the topic of references and copies
+but still leave the general discussion for later.
+We saw that <c:var>ap</c:var> is in fact a pointer that points to the
+C object <c:var>ap</c:var>. 
+This means that changes to the R variable <r:var>ap</r:var> change what
+the C variable <c:var>ap</c:var> points to which is <c:var>a</c:var>.
+So we can take a look at the i slot in <r:var>a</r:var> and then 
+change it in <r:var>ap</r:var>:
+<r:code>
+a@i
+ap$i = 99
+ap$i
+a@i
+</r:code>
+The same applies to any of the slots in <r:var>a</r:var> and <r:var>ap</r:var>.
+</para>
+
+
+<para>
+The R variable <r:var>xarray</r:var> provides access to a C array of
+length 4. The elements are instances of the struct _X (aliased as X
+via a typedef) type.  Each instance has fields named a and b
+which are integer and double scalars, respectively.
+When we access the R variable, we get a copy of the current contents
+of the array and this is converted as an R list of length 4
+and each element is a copy of the struct element. These are of
+class <r:s4class>X</r:s4class> in R.
+This class has slots that parallel the fields in the C-level struct,
+i.e. a and b.
+So we can access these in the usual way, treating
+<r:var>xarray</r:var> as a list, for example,
+<r:code>
+length(xarray)
+xarray[[1]]
+xarray[c(1, 2)]
+xarray[-c(1, 2)]
+sapply(xarray, slot, "a")
+</r:code>
+Again, we are dealing with a copy of the contents of the corresponding C variable.
+</para>
+
+
+<section>
+<title>References</title>
+<para>
+We now come to the point where we talk about working explicitly with
+references in our interface.  When accessing a C variable, we
+typically want its contents as an R value and that is what we have
+seen happens by default.  But there are also times when we do not want
+the value but instead want to be able to get a "handle" for the C
+variable.  We might pass it as an argument to a C routine.  Or we may
+want to modify its contents at the C-level of that variable as opposed
+to modifying a copy of the value in R.  
+For instance, to change the value of the <c:field>a</c:field> field of the first element of 
+the C variable <c:var>xarray</c:var>, we might want to do something like
+<r:code>
+xarray[[1]]@a = 1L 
+</r:code>,
+but this fails (because of the way we
+have made the C variables accessible directly as R variables via
+active bindings).  And in the case of large objects, we may not want
+to incur the computational expense of converting the entire
+object. For example, if we want to fetch just the first element of a
+long array, we could use the approach we saw above
+<r:code>
+array[1]
+</r:code>
+But this involves copying the entire contents of the C variable
+<c:var>array</c:var> to R and then subsetting the first element. It
+would be better to ask for just the first element of the C array and
+convert it.
+</para>
+<para>
+To be able to do the three things we mentioned in the paragraph above,
+we need to be able to references to C level objects.  When dealing
+with top-level/global variables, the programmatically generated code
+provides us with the necessary functions.  And the general bindings
+for routines, C++ classes, etc.  also deal with references in a very
+similar manner that is slightly more transparent (because there are no
+active bindings involved).  But we focus on the global variables in
+this discussion.
+</para>
+
+<para>
+Basically, for each C variable that is not of primitive type
+(e.g. int, double, long long, unsigned int), the code generation
+mechanism creates a corresponding function named
+<r:func>get_&lt;variable name&gt;</r:func>, e.g.
+<r:func>get_i</r:func> and <r:func>get_xarray</r:func>.  This is
+actually the function that is used to get and set the values of these
+dynamic variables and that binding mechanism invokes the binding
+function with zero or one arguments for get and set respectively.  But
+these functions have at least one additional argument, namely
+<r:arg>copy</r:arg>.  By default this is <r:true/> and so we get a
+copy of the contents of the C variable as an R object.  If <r:false/>
+is given for the value of <r:arg/>, then we get a reference to the C
+variable.  And then we can use that as we  want.
+</para>
+<para>
+Let's start with the variable <r:var>a</r:var> which is a dynamic variable
+accessing the C variable <c:var>c</c:var>.
+We can get a reference to the C variable with the command
+<r:code>
+aref = get_a(copy = FALSE)
+</r:code>
+Because <c:var>ap</c:var> is a C-level pointer that points <c:var>a</c:var>,
+<r:var>aref</r:var> and <r:var>ap</r:var> are essentially the same.
+We can print them both and we see that the pointer values in the ref slot 
+are the same. (We can't compare them using == and <r:func>identical</r:func>
+reports them as being different since they are external pointers.)
+</para>
+<para>
+Since they are the same object, we can use <r:var>aref </r:var> to 
+get and set fields in the C variable <c:var>a</c:var> as we did above,
+e.g.,
+<r:code>
+names(aref)
+aref$i
+aref$uarray
+aref$uarray = rpois(3, 10)
+</r:code>
+And if there is a routine that expects a pointer to a struct A as an argument,
+we can pass this object to it from R.
+</para>
+<para>
+Now, let's look at arrays.
+We'll start with the simple kinds which are arrays of primitive types
+such as the variables <r:var>array</r:var> and <r:var>uarray</r:var>.
+(We'll come to <r:var>xarray</r:var> soon.)
+Since these are C-level global variables of non-primitive type, 
+we have the <r:func>get_array</r:func> and <r:func>get_uarray</r:func>
+functions with which we can get a reference to the C variable.
+So we do this and assign the value to <r:var>ar</r:var>, say:
+<r:code>
+ar = get_array(copy = FALSE) 
+</r:code>
+This is an R object of class <r:class>intArray</r:class>!
+That's a new class that was generated by the code generation mechanism.
+It uses classes exported from <omg:pkg>RAutoGenRunTime</omg:pkg> and 
+inherits methods that make it seem like a regular R vector.
+We can ask for its length
+<r:code>
+length(ar)
+</r:code>
+and it returns the number of elements in the C-level array.
+We can access individual elements with
+either the <r:operator>[</r:operator> or <r:operator>[[</r:operator> operators:
+<r:code>
+ar[1]
+ar[[1]]
+</r:code>
+We can do the usual  subsetting on the array reference
+such as
+<r:code>
+ar[ - 2]
+ar[ - (1:5)]
+ar[4:10]
+</r:code>
+</para>
+
+<para>
+The <r:func>get_&lt;variable&gt;</r:func> function for C-level arrays
+has two additional parameters named <r:arg>from</r:arg> and
+<r:arg>to</r:arg>.  These are intended to correspond to the parameters
+of the <r:func>seq</r:func> function and allow the caller to fetch a
+segment of the underlying array, i.e. a subset of the elements between
+<r:arg>from</r:arg> and <r:arg>to</r:arg> inclusive.  These values use
+the regular 1-based indexing, i.e. the first element is at position 1
+rather than C's 0-based indexing.  These values are tested to ensure
+that they are within the extent of the array.
+The defaults are for the entire array and one can specify 
+either value or both, and for covenience, the value of 
+<r:arg>from</r:arg> can be a vector of two numbers which are treated
+as the pair (<r:arg>from</r:arg>, <r:arg>to</r:arg>).
+So the following are legitimate subsets of the array:
+<r:code>
+get_array(from = 4)
+get_array(from = 4, to = 8)
+get_array(from = c(4, 8))
+get_array(to = 8)
+get_array(from = 10)
+
+get_array(from = c(8, 4))
+get_array(from = 8, to = 4)
+</r:code>
+
+The following are not:
+<r:code>
+get_array(from = 11)
+get_array(from = -3)
+</r:code>
+Both refer to values outside of the extent of the array.
+</para>
+
+<para>
+These <r:func>get_*</r:func> functions are created for top-level C
+variables. But when we are dealing with the much more common situation
+where the are fields in structures or routines that return pointers
+that are implicit arrays (not just a pointer to a scale) or actual
+arrays, we want to be able do the same sort of operations.  However,
+there is no corresponding <r:func>get_</r:func>.  There will be a
+function created as part of the code generation mechanism named
+<r:func>get&lt;type&gt;Array</r:func> where <emphasis>type</emphasis>
+is the name of the C-level element type of the array, written in
+"camelBack" notation (i.e. each word capitalized, and spaces removed).
+For our <r:var>xarray</r:var> variable which is an array of C-level
+<c:type>unsigned int</c:type> elements, the name of the function is
+<r:func>getUnsignedIntArray</r:func>.
+We can use this function on an array of the correct type.
+<note><para>We don't make excessive checks except at the external pointer level
+and some of these need to be made more strict. But these are expensive</para></note>
+<r:code>
+ar = get_array(copy = FALSE)
+getIntArray(ar, 3, 7)
+</r:code>
+
+<ignore>
+<r:code>
+ar = get_array(copy = FALSE)
+.Call('R_subsetIntArray', ar, as.integer(c(1, 2, 3, 3, 2, 1)))
+
+ar[c(1, 2, 3, 4, 5, 3, 2, 5)]
+</r:code>
+</ignore>
+</para>
+
+<para>
+We now come to the array of non-primitive types,
+<r:var>xarray</r:var>.
+If we want to get a reference to it, we call
+<r:func>get_xarray</r:func> with the <r:arg>copy</r:arg>
+parameter set to <r:false/>.
+<r:code>
+xx = get_xarray(copy = FALSE)
+</r:code>
+
+We can subset this in the usual way as we discussed above
+and we get back lists of the specified elements.
+<r:code>
+xx[c(1,3)]
+xx[c(3,4)]
+xx[[1]]
+x[]  
+</r:code>
+The last of these returns all the elements.  And in each case, the
+values are <emphasis>copies</emphasis> of the C-level elements
+converted to their R equivalent, i.e. objects of class
+<r:class>X</r:class> with two slots named a and b.  But just as we got
+a reference to the top-level array variable, can't we get a reference
+to an individual element?  We wouldn't ask if it weren't possible, and
+again the magic is the <r:arg>copy</r:arg> parameter.  We can specif
+this in the subset operation, such as,
+<r:code>
+xx[1, copy = FALSE]
+xx[[1, copy = FALSE]]
+</r:code>
+The next commands are left as "an exercise for the reader"
+to figure out what types are involved?
+<r:code>
+names(xx[1, copy = FALSE][[1]]) == slotNames(xx[[1]])
+names(xx[1, copy = FALSE][[1]]) == slotNames("X")
+</r:code>
+<invisible>
+The left hand side gets an XPtr and the names method gets the names of
+the fields it contains.  The right hand side is an object of class X
+and has slots named a and b.  The second command makes it somewhat
+clearer by identifying the class in the RHS.
+</invisible>
+
+</para>
+
+<section>
+<title>References to Fields</title>
+<para>
+Just as we may want to be able to get a reference to a
+top-level variable, we may also want to be able avoid
+copying the value of a field in a C-level struct,
+but rather get a reference to it.
+We cannot do this with the <r:operator>$</r:operator> operator
+as that syntax just allows an object and field name.
+However, we can use the <r:operator>[[</r:operator>
+and a <r:arg>copy</r:arg> parameter. 
+Where it makes sense, i.e. when the field is a non-primitive type, 
+one can get a reference by supplying a value <r:false/> for that parameter,
+e.g
+<r:code>
+ap[["uarray", copy = FALSE]]
+</r:code>
+This would return an object of class <r:class>unsignedIntArray</r:class>
+as we saw before for <r:expr>get_uarray(copy = FALSE)</r:expr>.
+<note><para>Should this be for all generated methods but ignore it where it is not relevant.</para></note>
+
+</para>
+
+</section>
+<section>
+<title>Setting array values</title>
+<para>
+When we have a reference to a C-level array,
+i.e. we have an R object that extends <r:class>ExternalArrayWithLength</r:class>,
+we can both duplicate it via <r:func>duplicate</r:func>
+and we can set elements using regular  subset assignment.
+<r:code>
+xx = ap[["uarray", copy = FALSE]]
+xx
+<r:output><![CDATA[
+An object of class "unsignedIntArray"
+Slot "length":
+[1] 3
+
+Slot "elementSize":
+[1] 4
+
+Slot "ref":
+<pointer: 0x4b17ac>
+
+Slot "classes":
+character(0)
+]]></r:output>
+
+
+xx[]
+<r:output>
+[1] 1 2 3
+</r:output>
+xx[1:2]
+<r:output>
+[1] 1 2
+</r:output>
+xx[3:2] = c(10, 20)
+xx[]
+<r:output>
+[1]  1 20 10
+</r:output>
+</r:code>
+
+</para>
+<para>
+For string vectors, we have 
+<r:code>
+Strings
+Strings = paste(LETTERS[1:7], rpois(7, 40))
+</r:code>
+</para>
+
+</section>
+<section>
+<title>Pointers as Arrays</title>
+<para>
+We can treat a pointer as an array when we know that
+this makes sense by 
+<r:code>
+pointer
+init()
+p = new("intArray", ref = pointer@ref, length = pointerLen)
+p[4]
+p[]
+</r:code>
+</para>
+</section>
+
+<section>
+<title>Copying to a particular depth</title>
+<para>
+The idea to copy or not is useful, but
+even more useful is the idea of copying down
+to a certain point.
+Consider our variable <c:var>f_struct</c:var>.
+It contains references to instances of the struct types E and D.
+And E itself contains a struct 
+
+<r:code>
+slotNames(l1)
+
+p1 = get_l1(copy = FALSE)
+names(p1)
+
+p2 = p[["l2", copy = FALSE]]
+names(p2)
+</r:code>
+</para>
+</section>
+
+</section>
+
+
+
+
+<section>
+<title>Duplication</title>
+<para>
+We can also create duplicates C-level objects when 
+we have a reference to a C structure or  array.
+We use the <r:func>duplicate</r:func> function for this.
+For example, we can duplicate the C-level variable <c:var>a</c:var>
+as follows.
+<r:code>
+ar = get_a(copy = FALSE)
+ar$i = 100
+ar2 = duplicate(ar)
+ar$i
+ar2$i
+ar2$i = 1
+ar2$i
+ar$i
+</r:code>
+</para>
+<para>
+We can also duplicate arrays.
+The following shows how we 
+<r:code>
+xx = ap[["uarray", copy = FALSE]]
+xx[]
+v = duplicate(xx)
+v[]
+xx[c(1,3)] = c(20, 100)
+xx[]
+v[]
+</r:code>
+</para>
+<para>
+Note that we can add a garbage collection finalizer to the
+newly created array using the .finalizer argument.
+This is off by default so that the memory is not released.
+This is bad, but better than freeing it when it is in use
+by some other data structures, perhaps in C and used in C code.
+You can activate the finalizer in the call to 
+<r:func>duplicate</r:func> via the <r:arg>.finalizer</r:arg>
+argument, e.g.,
+<r:code>
+duplicate(xx, .finalizer = TRUE)
+duplicate(xx, .finalizer = "SimpleAllocFinalizer")
+</r:code>
+and also by explicitly setting it via <r:func>addFinalizer</r:func>
+<r:code>
+addFinalizer(v, TRUE)
+addFinalizer(v, getNativeSymbolInfo("SimpleAllocFinalizer")$address)
+addFinalizer(v, "SimpleAllocFinalizer")
+</r:code>
+The finalizer argument identifies either the C routine or
+the R function that is to
+be called when R's garbage collector no longer has any references 
+to the contents. 
+Note that this operates on the ref slot of the <r:class>RC++Reference</r:class>
+object, not the entire <r:class>RC++Reference</r:class> object!
+</para>
+<para>
+In the future, we may provide support in <r:func>duplicate</r:func>
+for specifying whether and how to copy the elements.
+</para>
+</section>
+
+<para>
+References to two-dimensional arrays in C can be
+subsetted like matrices or data frames in R
+<r:code>
+xx = get_xarray2D(copy = FALSE)
+dim(xx)
+nrow(xx)
+ncol(xx)
+as(xx, "array")
+xx[]
+</r:code>
+</para>
+<para>
+Let's consider assigments to elements of 
+multi-dimensional C-level arrays.
+We might like to be able to something such as
+<r:fix>
+matrix[1,1] = 10
+
+xx[2,3]@a = 27L
+xx[2,3] = new("X", a = 27L, b = 20L)
+</r:fix>
+
+</para>
+</section>
+
+<section>
+<title>
+</title>
+<para>
+This doesn't belong here but tests the linked lists and 
+recursively defined structures, i.e. where an element is a pointer
+to an element of the structure being defined.
+
+<r:code>
+myList = makeList(5)
+names(myList)
+
+# Do the linked list length calculation and 
+setMethod("length", "ElementPtr",
+  function(x) {
+   ctr = 0
+   el = x
+   while(!isNativeNull(el)) { ctr = ctr + 1 ; el = el[["next"]]}
+   ctr
+ })
+
+length(myList)
+</r:code>
+And here is a version of <r:func>lapply</r:func> for these linked lists.
+<r:code>
+setMethod("lapply", "ElementPtr",
+  function(X, FUN, ...) {
+   FUN <- match.fun(FUN)
+
+   ctr = 1
+   el = X
+   ans = list()
+   while(!isNativeNull(el)) { 
+      ans[[ctr]] = FUN(el, ...)
+      el = el[["next"]]
+      ctr = ctr + 1 ; 
+   }
+   ans
+ })
+
+mm = makeList(10)
+lapply(mm, names)
+</r:code>
+Perhaps we could do this for R with C++ templates too.
+</para>
+</section>
+
+
+<section>
+<title>Checking the builtin-type classes</title>
+<para>
+The following is code that will be moved elsewhere when I get time.
+It is a check for the type names and classes for the builtins.  It
+checks that the names of the BuiltinPrimitiveType classes and the
+prototype name for each match what gcc emits in the translation unit.
+This needs to move somewhere else as a way to validate the builtin
+table.
+</para>
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU("vars.c.001t.tu", language = "C")
+g = getGlobalVariables(tu, "vars")
+gvars = resolveType(g, tu)
+
+typeNames = unlist(sapply(gvars, function(x) x@type@name))
+cTypeNames = typeNames = typeNames[!is.na(typeNames)]
+rClassNames = paste(capitalize(typeNames, first = FALSE), "Type", sep = "")
+
+defs = sapply(rClassNames, getClassDef)
+w = sapply(defs, is.null)
+cbind(cTypeNames[w], rClassNames[w])
+
+table = read.csv("../../../data/BuiltinTypeTable.csv", stringsAsFactors = FALSE)
+
+sapply(table$RTypeClass, function(x) new(x)@name) == table$C
+</r:code>
+</section>
+</article>

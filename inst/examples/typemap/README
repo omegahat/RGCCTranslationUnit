@@ -1,0 +1,40 @@
+typemap.c & typemap.h  - original C code
+
+typemap.R   - R code to generate the bindings
+
+test.R      - R code to test the bindings
+
+Rtypemap.h  - manually create header file for use in generated code.
+
+Rutils.c, Rutils.h, utils.R
+
+
+Automatically generated code.
+
+RtypemapCode.c
+Rtypemap.R
+
+
+
+-------------------------------------------------------------------------
+
+
+There are two ways to map a FILE *.
+One is to convert the R argument to string and check the file exists, 
+etc. Then in the convertRValue action, we call a special routine
+that maps the R string to a FILE * by opening the file.
+This is relatively simple but requires some work by us
+and is limited to reading files. If we want to open a file
+for writing, we need to tell the C routine in convertRValue
+this and that involves more parameters than we have from the automatic
+bindings.  We could use a character vector of c(filename, mode)
+or pass in a "symbolic" connection.
+
+The other alternative is to create bindings for the FILE *.  This
+involves defining a reference class for FILERef.  We define a coercion
+method from character to FILERef using the open mechanism we have
+above. And then we are all set.  So it is about the same amount of
+work for us.  But it is more flexible as the user can create a FILERef
+themselves and so pass us a previously opened file reference.
+And this includes creating a writeable FILERef object.
+We also arrange close

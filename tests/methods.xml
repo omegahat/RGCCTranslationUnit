@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+
+<article xmlns:r="http://www.r-project.org">
+<section>
+<para>
+The idea is to test what the S4 setMethod () mechanism can do automatically
+for our C++ code where there may be several top-level routines
+and class methods of the same name.
+We'll take an example from shapes.h in the inst/examples/Shapes/ directory
+of this package.
+And we'll add a top-leve routine.
+</para>
+<para>
+We have classes Rectangle, Circle, Ellipse which each have 2 methods
+named scale.  These are inherited from the virtual class Shape and
+each class provides their own implementation.  We'll
+also add two top-level routines.
+
+<r:code>
+setGeneric("Scale", function(this, a, b, c, super) standardGeneric("Scale"))
+</r:code>
+<r:code>
+setMethod("Scale", c("Circle"),
+             function(this)# , a, b, c, super) 
+             {
+               "top-level Scale(Circle *)"
+             })
+</r:code>
+If we just use the function definition function(this)
+we get warnings about the definition not having
+the additional parameters a,b, c, super.
+These are warnings but nevertheless something we don't want.
+</para>
+<para>
+We cannot use a different parameter name in the function definition
+from the signature of the generic for  a parameter used in the signature
+for this method.
+</para>
+</section>
+
+
+<section>
+<para>
+We'll try a different experiment in which 
+we define methods 
+</para>
+</section>
+</article>

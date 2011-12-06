@@ -1,0 +1,114 @@
+<article>
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU("inst/examples/nifticlib/nifti.c.t00.tu")
+nifti.routines = getRoutines(tu, c("nifti1", "fslio"))
+</r:code>
+<r:code>
+FslInit = resolveType(nifti.routines$FslInit, tu)
+</r:code>
+
+<r:code>
+defs = DefinitionContainer(tu)
+</r:code>
+
+<r:code>
+defs$FSLIO
+names(defs$FSLIO@fields)
+</r:code>
+
+<r:code>
+o = resolveType(defs$FSLIO@fields$niftiptr@type@type)
+o@name
+</r:code>
+
+
+<r:code>
+# 64 fields.
+names(o@fields)
+</r:code>
+
+<r:code>
+fieldTypes = sapply(o@fields, function(x) class(x@type))
+table(fieldTypes)
+<r:output>
+            ArrayType               CString            doubleType EnumerationDefinition               intType 
+                    5                     2                    23                     1                    27 
+          PointerType ResolvedTypeReference      StructDefinition 
+                    2                     1                     3 
+</r:output>
+</r:code>
+So there are many basic/primitive types.
+
+<para>
+The ResolvedTypeReference is an a type that needs to be resolved
+one more time .
+<r:code>
+o@fields[[ which(fieldTypes == "ResolvedTypeReference") ]]@type  = resolveType(o@fields[[ which(fieldTypes == "ResolvedTypeReference") ]]@type)
+</r:code>
+Note that we don't need the tu as the second argument for a ResolvedTypeReference.
+So this object is a mat44 and is the same as the three StructDefinition fields.
+</para>
+<para>
+So the only other potentially "exotic" elements are
+the PointerType fields.
+We can find the "depth" of the pointer and
+the type with
+<r:code>
+sapply(o@fields[ fieldTypes == "PointerType" ], function(x) x@type@depth)
+<r:output>
+    data ext_list 
+       1        1 
+</r:output>
+sapply(o@fields[ fieldTypes == "PointerType" ], function(x) x@type@type@name)
+<r:output>
+              data           ext_list 
+            "void" "nifti1_extension" 
+</r:output>
+</r:code>
+The void * is essentially unknowable without human intervention.
+So let's take a look at nifti1_extension
+<r:code>
+class(defs$nifti1_extension)
+</r:code>
+This is also a StructDefinition,
+so let's look at its fields:
+<r:code>
+names(defs$nifti1_extension@fields)
+<r:output>
+[1] "esize" "ecode" "edata"
+</r:output>
+</r:code>
+And these are all basic types
+<r:code>
+ sapply(defs$nifti1_extension@fields, function(x) class(x@type))
+<r:output>
+    esize     ecode     edata 
+"intType" "intType" "CString" 
+</r:output>
+</r:code>
+</para>
+
+<para>
+The arrays are also primitive:
+<r:code>
+sapply(o@fields[ fieldTypes == "ArrayType" ], function(x) class(x@type@type))
+<r:output>
+         dim       pixdim  intent_name      descrip     aux_file 
+   "intType" "doubleType"   "charType"   "charType"   "charType" 
+</r:output>
+</r:code>
+
+And we have the length of these arrays.
+<r:code>
+sapply(o@fields[ fieldTypes == "ArrayType" ], function(x) x@type@length)
+</r:code>
+</para>
+<para>
+<r:code>
+enums = getEnumerations(tu)
+ # Get the values of the enum.
+resolveType(enums[[1]], tu)@values
+</r:code>
+</para>
+</article>

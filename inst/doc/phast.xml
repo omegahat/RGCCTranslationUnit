@@ -1,0 +1,35 @@
+<article>
+
+<sh:code>
+gcc -c -fdump-translation-unit -I/home/duncan/Phast/phast/include -o /dev/null phast.c
+</sh:code>
+
+<r:code>
+phast.tu = parseTU("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/Example/phast.c.001t.tu")
+</r:code>
+
+
+We will use these in several operations
+<r:code>
+phastHeaderFiles = list.files("~/Phast/phast/include"))
+</r:code>
+
+<r:code>
+defs = getCppDefines("~/Projects/org/omegahat/SLanguage/InterfaceGenerators/Gcc/Perl/inst/Example/phast.c", "-I/home/duncan/Phast/phast/include", cpp = "gcc")
+macros = processDefines(defs, tu = phast.tu, files = gsub("\\.h$", "", phastHeaderFiles)
+</r:code>
+
+
+<r:code>
+rr = getRoutines(phast.tu, phastHeaderFiles)
+phast.routines = resolveType(rr, phast.tu)
+bb = createMethodBinding(phast.routines)
+</r:code>
+
+
+
+
+
+
+
+</article>

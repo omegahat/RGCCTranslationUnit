@@ -1,0 +1,241 @@
+<article xmlns:r="http://www.r-project.org">
+<title>Generating bindings to fann for R</title>
+<section>
+<para>
+This is a quick look at generating bindings to 
+the <ulink url="http://leenissen.dk/fann"> Fast Artificial Neural Network Library</ulink>.
+
+</para>
+<para>
+We create a simple C file that includes the relevant header files from
+FANN.
+<c:code file="fann.c"><![CDATA[
+#include <fann.h>
+]]></c:code>
+</para>
+<para>
+Now we  can read this into R with
+<r:code>
+library(RGCCTranslationUnit)
+tu = parseTU("fann.c.001t.tu")
+</r:code>
+</para>
+<para>
+We need to decide which routines are of interest
+to us and hence which data types are relevant.
+Alternatively, we can focus immediately 
+on the 
+<c:struct>fann</c:struct> and 
+<c:struct>fann_train_data</c:struct>
+data structures.
+<r:code>
+ds = getDataStructures(tu)
+fann.ds = resolveType(ds[c("fann", "fann_train_data")], tu)
+</r:code>
+This assumes that these <c:keyword>struct</c:keyword>s
+are typedef'ed. 
+This gives us the two <c:keyword>struct</c:keyword>
+definitions.
+<r:code>
+sapply(fann.ds, class)
+<r:output>
+              fann    fann_train_data 
+"StructDefinition" "StructDefinition" 
+</r:output>
+</r:code>
+
+What do these object contain:
+<r:code>
+fann = fann.ds[[1]]
+getClass(class(fann))
+<r:output>
+Slots:
+                                                             
+Name:      fields       name      alias qualifiers      scope
+Class:       list  character  character  character  character
+
+Extends: 
+Class "ContainerDefinition", directly
+Class "TypeDefinition", by class "ContainerDefinition", distance 2
+</r:output>
+</r:code>
+So we see the fields in the <c:keyword>struct</c:keyword> are
+<r:code r:width="80">	 <!-- r:width is an option for R and should be used when producing the output. -->
+names(fann@fields)
+<r:output>
+ [1] "errno_f"                              "error_log"                           
+ [3] "errstr"                               "learning_rate"                       
+ [5] "learning_momentum"                    "connection_rate"                     
+ [7] "network_type"                         "first_layer"                         
+ [9] "last_layer"                           "total_neurons"                       
+[11] "num_input"                            "num_output"                          
+[13] "weights"                              "connections"                         
+[15] "train_errors"                         "training_algorithm"                  
+[17] "total_connections"                    "output"                              
+[19] "num_MSE"                              "MSE_value"                           
+[21] "num_bit_fail"                         "bit_fail_limit"                      
+[23] "train_error_function"                 "train_stop_function"                 
+[25] "callback"                             "user_data"                           
+[27] "cascade_output_change_fraction"       "cascade_output_stagnation_epochs"    
+[29] "cascade_candidate_change_fraction"    "cascade_candidate_stagnation_epochs" 
+[31] "cascade_best_candidate"               "cascade_candidate_limit"             
+[33] "cascade_weight_multiplier"            "cascade_max_out_epochs"              
+[35] "cascade_max_cand_epochs"              "cascade_activation_functions"        
+[37] "cascade_activation_functions_count"   "cascade_activation_steepnesses"      
+[39] "cascade_activation_steepnesses_count" "cascade_num_candidate_groups"        
+[41] "cascade_candidate_scores"             "total_neurons_allocated"             
+[43] "total_connections_allocated"          "quickprop_decay"                     
+[45] "quickprop_mu"                         "rprop_increase_factor"               
+[47] "rprop_decrease_factor"                "rprop_delta_min"                     
+[49] "rprop_delta_max"                      "rprop_delta_zero"                    
+[51] "train_slopes"                         "prev_steps"                          
+[53] "prev_train_slopes"                    "prev_weights_deltas"                 
+[55] "scale_mean_in"                        "scale_deviation_in"                  
+[57] "scale_new_min_in"                     "scale_factor_in"                     
+[59] "scale_mean_out"                       "scale_deviation_out"                 
+[61] "scale_new_min_out"                    "scale_factor_out"                    
+</r:output>
+</r:code>
+This is a large collection.
+The <c:struct>fann_train_data</c:struct> is shorter:
+<r:code>
+names(fann.ds[[2]]@fields)name
+<r:output>
+[1] "errno_f"    "error_log"  "errstr"     "num_data"   "num_input"  "num_output" "input"     
+[8] "output"    
+</r:output>
+</r:code>
+</para>
+<para>
+One of the interesting things that comes from these and reading the documentation
+for FANN's data structures is that these both contain a
+<c:struct>fann_error</c:struct> object in the first fields:
+<r:code>
+names(resolveType(ds[["fann_error"]], tu)@fields)
+match(names(resolveType(ds[["fann_error"]], tu)@fields), names(fann@fields))
+</r:code>
+This is simple C-style inheritance and so we can cast 
+one of these <c:struct>fann</c:struct> instances to
+an  <c:struct>fann_error</c:struct>.
+
+</para>
+<para>
+
+</para>
+
+<para>
+The Datatypes help page also mentionds the constants and enumerations
+which we will want.
+We can find the enumerations with 
+<r:code>
+enums = getEnumerations(tu)
+</r:code>
+This gives
+<r:code showCode="false">
+grep("^fann", names(enums), value = TRUE)
+<r:output>
+[1] "fann_errno_enum"          "fann_train_enum"          "fann_activationfunc_enum"
+[4] "fann_errorfunc_enum"      "fann_stopfunc_enum"       "fann_nettype_enum"       
+[7] "fann_errno_enum"         
+</r:output>
+</r:code>
+There is a discrepancy between the documentation and what we have
+as we find a fann_nettype_enum and it is named 
+fann_network_type_enum, and the code is correct.
+<fixme>Also, we see two fann_errno_enum nodes</fixme>
+</para>
+
+<para>
+The "constants" such as 
+FANN_TRAIN_NAMES are merely the names of the 
+enumeration elements. We already have these
+from the enumeration definition.
+However, we can find these via
+<r:func>getGlobalVariables(tu)</r:func>:
+<r:code>
+names(getGlobalVariables(tu))
+<r:output>
+ [1] "FANN_TRAIN_NAMES"          "FANN_ACTIVATIONFUNC_NAMES" "FANN_ERRORFUNC_NAMES"     
+ [4] "FANN_STOPFUNC_NAMES"       "FANN_NETTYPE_NAMES"        "_IO_2_1_stdin_"           
+ [7] "_IO_2_1_stdout_"           "_IO_2_1_stderr_"           "stdin"                    
+[10] "stdout"                    "stderr"                    "sys_nerr"                 
+[13] "sys_errlist"               "fann_default_error_log"    "signgam"                  
+[16] "_LIB_VERSION"              "5263"                      "5265"                     
+[19] "5267"                      "5269"                      "5271"                     
+[22] "5273"                      "5275"                      "5298"                     
+[25] "5300"                      "5302"                      "5304"                     
+[28] "5306"                      "5308"                      "5320"                     
+[31] "5322"                      "5324"                      "5326"                     
+[34] "5328"                      "5330"                      "5332"                     
+[37] "5334"                      "5336"                      "5338"                     
+[40] "5340"                      "5342"                      "5344"                     
+</r:output>
+</r:code>
+There are numerous unnamed (at the C-level) variables given by entries with names
+in R such as 5340.
+
+</para>
+
+<para>
+Instead of looking at  data types, we can look at the routines:
+<r:code>
+routines = getRoutines(tu, "fann")
+length(names(routines))
+<r:output>
+166
+</r:output>
+</r:code>
+</para>
+
+<para>
+To get the more complete descriptions of the routines, we
+can work from the source of fann directly, i.e. the C files
+rather than header files.
+We create a new C file, fann-src.c as 
+<c:code>
+<xi:include href="fann-src.c" parse="text"/>
+</c:code>
+We omit the fixedfann.c and floatfann.c files.
+</para>
+<para>
+
+We generate the TU file with
+<sh:code>
+setenv FANN_SRC_DIR $HOME/fann-2.1.0
+gcc -c -o /dev/null -fdump-translation-unit -I$FANN_SRC_DIR/src -I$FANN_SRC_DIR/src/include fann-src.c 
+</sh:code>
+And next, we read this into R
+<r:code>
+tu.src = parseTU("fann-src.c.001t.tu")
+rr = getRoutines(tu.src)
+</r:code>
+</para>
+<para>
+Now we can look at the 
+<c:routine>fann_create_standard</c:routine> routine:
+<r:code>
+createStandard = resolveType(rr[["fann_create_standard"]], tu.src)
+names(createStandard$parameters)
+<r:output>
+[1] "num_layers"
+</r:output>
+</r:code>
+
+<r:code>
+train = resolveType(rr[["fann_train_on_data"]], tu.src)
+names(train$parameters)
+</r:code>
+
+To generate
+
+
+</para>
+
+<para>
+We want to be able to pass data from R to FANN
+(fann_read_train_from_file)
+</para>
+
+</section>
+
+</article>

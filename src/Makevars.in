@@ -1,0 +1,4 @@
+
+PKG_CPPFLAGS=-I../inst/TUParser/include @PCRE_CFLAGS@ @DEFINES@
+PKG_LIBS= @PCRE_LIBS@
+
