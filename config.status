@@ -505,7 +505,7 @@ s,@build_alias@,|#_!!_#|,g
 s,@host_alias@,|#_!!_#|,g
 s,@target_alias@,|#_!!_#|,g
 s,@PERL5LIB@,|#_!!_#|/tmp/R/pkg/RSPerl/share/blib/arch:/tmp/R/pkg/RSPerl/share/blib/lib:/tmp/R/pkg/RSPerl/scripts:/Users/duncan/Projects/org/omegahat/SLanguage/SHelp/tools/R:/Users/duncan/Projects/org/omegahat/SLanguage/SHelp/share,g
-s,@PKG_CONFIG@,|#_!!_#|/opt/local/bin/pkg-config,g
+s,@PKG_CONFIG@,|#_!!_#|/usr/local/bin/pkg-config,g
 s,@CXX@,|#_!!_#|g++,g
 s,@CXXFLAGS@,|#_!!_#|-g -O2,g
 s,@LDFLAGS@,|#_!!_#|,g
