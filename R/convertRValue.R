@@ -37,6 +37,11 @@ setMethod("convertRValue", c(parm = "intType"),
                      paste("asInteger(", name, ");")
               })
 
+setMethod("convertRValue", c(parm = "unsignedIntType"),
+              function(to, name, parm, parameters, typeMap = list(), helperInfo = NULL) {
+                     paste("asReal(", name, ");")
+              })
+
 
 setMethod("convertRValue",  c(parm = "doubleType"),
               function(to, name, parm, parameters, typeMap = list(), helperInfo = NULL) {

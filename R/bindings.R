@@ -833,7 +833,8 @@ function(m,
          className = if(is(m, "ResolvedNativeClassMethod")) m$className else character(),
          isPolymorphic = FALSE,
          addRFunctionNames = !isPolymorphic && length(inheritedClassNames) == 0,
-         name = m$name,
+         name = m$name, 
+         rfuncName = if(length(prefix)) sprintf("%s%s", prefix, name) else name,
          nodes = list(),
          typeMap = list(),
          paramStyle = if("paramStyle" %in% names(m)) m$paramStyle else rep(NA, length(m$parameters)),
@@ -846,7 +847,9 @@ function(m,
          force = FALSE,
          signature = NULL,
          dispatchInfo = data.frame(),
-         useSignatureParameters = TRUE
+         useSignatureParameters = TRUE,
+         prefix = if(addDot) "." else character(),
+         addDot = FALSE
          )
 {
 
@@ -1032,7 +1035,7 @@ function(m,
 #     params[".inherited"] = ".inherited = logical()"
    
           # If the name has 2 or more elements, then the R name is taken to be the second one.
-   rfuncName = if(length(name) > 1) name[2] else name
+#   rfuncName = if(length(name) > 1) name[2] else name
    if(isConstructor)
       rfuncName = paste(getTUOption("constructorNamePrefix", ""), className, sep = "")  # className #XXX use newClassName for constructor name
 
@@ -1053,8 +1056,6 @@ function(m,
 
   
    indent = ""
-
-
   
    funcDef = createRCode(m, rfuncName, routine, typeMap,
                           hasDotCopy, addInherited, isVoidRoutine, inheritedClassNames, outArgs = outArgs,
@@ -1119,7 +1120,7 @@ function(m,
    els = list(r = funcDef,
               native = native$code,
               nativeDeclaration = native$cdecl,
-              registrationInfo = list(name = structure(routineName, names = routine),
+              registrationInfo = list(name = structure(routineName, names = routine[1]),
                                            nargs = native$code@nargs), # length(m$parameters) + hasDotCopy + addInherited
               ifdef = ifdef)
 
@@ -1398,7 +1399,9 @@ function(routineName, m, params, routine, className, typeMap, hasDotCopy, outArg
                                   rhs = paste(ifelse(id == "this", "This", id) , " = ", rhs, ";")
 
                                if(out) 
-                                rhs = c(paste("if(GET_LENGTH(", paste("r", origId, sep = "_"), ") > 0)  {"), paste(indent, rhs, sep = ""), "\t\t}")
+                                rhs = c(paste("if(GET_LENGTH(", paste("r", origId, sep = "_"), ") > 0)  {"),
+                                        paste(indent, rhs, sep = ""),
+                                        "}")
 
                              }
                              
@@ -1421,7 +1424,7 @@ function(routineName, m, params, routine, className, typeMap, hasDotCopy, outArg
      native = c(native, "", createCallInheritedCode(routineName, names(m$parameters), inheritedClassNames, result = if(isVoidRoutine) character() else "ans", m$parameters))
    else if(call != "")
       native = c(native, "",
-                  paste(indent, if(isConstructor || (!noAnsAssign && length(r) && r != "")) "ans = ",  call,  ";", sep = ""))
+                  paste(indent, if(isConstructor || (!noAnsAssign && length(r) && r != "")) " ans = ",  call,  ";", sep = ""), "")
 
    if(length(rtnCode))
      r = rtnCode
@@ -1670,7 +1673,8 @@ function(parms,  method, returnType, typeMap, styles, pointerPrefix = "_p_")
      txt = c(txt,
              paste("SET_VECTOR_ELT(r_ans, 0, ",  returnType, ");"),
              'SET_STRING_ELT(r_names, 0, mkChar(".result"));',
-             'r_ctr++;', "")
+             'r_ctr++;',   # move to the next position.
+             "")
 
 
    tmp = lapply(seq(along = parms),

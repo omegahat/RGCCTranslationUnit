@@ -17,6 +17,7 @@ Description:  This package provides rich facilities for
   and general refactoring.
 Version: 0.6-0
 Maintainer: Duncan Temple Lang <duncan@wald.ucdavis.edu>
+Contributors:  Gabe Becker
 Author: Duncan Temple Lang <duncan@wald.ucdavis.edu>
 Depends: methods
 Imports: bitops, Combinations, RAutoGenRunTime (>= 0.2-0)

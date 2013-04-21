@@ -162,6 +162,11 @@ function(node) {
        type = node[["type"]]
     else  # Assuming it is a function_type
        type = node
+
+    i = grepl("^[0-9]+$", names(params))
+    if(length(params) && all(i)) 
+       names(params) = sprintf("arg%d", seq(along = params))
+
      
     structure( list(parameters = params, 
                     INDEX = getIndex(node),

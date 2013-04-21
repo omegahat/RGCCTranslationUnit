@@ -479,3 +479,5 @@ exportMethods(getRTypeName)
 exportMethods(show)
 
 exportClasses("NodeIndex", "RAnonymousFunctionOrCode")
+
+export(createMethodBinding, createRoutineBinding)

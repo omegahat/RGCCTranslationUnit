@@ -1,5 +1,5 @@
 # Share with bindings.R and all the code that adds indentation.
-Indent = "\t"
+Indent = "    "
 
 # create all the code to work with structures
 
@@ -59,51 +59,54 @@ function(type, fields = type@fields, cname = getReferenceClassName(type))
 }  
 
 generateStructInterface =
-function(type, classDefs, typeMap = list(), defaultBaseClass = "RC++StructReference")
+function(type, classDefs, typeMap = list(), defaultBaseClass = "RC++StructReference",
+         addFinalizer = TRUE)
 {
- if(is(type, "ResolvedTypeReference"))
-    type = resolveType(type)
+   if(is(type, "ResolvedTypeReference"))
+      type = resolveType(type)
   
- if(is(type, "TypedefDefinition"))
-   type = type@type
+   if(is(type, "TypedefDefinition"))
+     type = type@type
 
- if(!is(type, "StructDefinition") && !is(type, "C++ClassDefinition"))
-   stop("Need a StructDefinition object for generateStructInterface")
+   if(!is(type, "StructDefinition") && !is(type, "C++ClassDefinition"))
+     stop("Need a StructDefinition object for generateStructInterface")
 
- tu = get(".nodes", classDefs)
+   tu = get(".nodes", classDefs)
  
  # type = fixupStructNames(type)
 
 #  Need the coerce method.
- z = createRFieldAccessors(type, typeMap = typeMap, tu = tu)
- a = createRFieldAccessors(type, get = FALSE, typeMap = typeMap, tu = tu) #$generic,
+   z = createRFieldAccessors(type, typeMap = typeMap, tu = tu)
+   a = createRFieldAccessors(type, get = FALSE, typeMap = typeMap, tu = tu) #$generic,
 #XXX Can ask for the generics only for this
- b =         
-   #XXX misnamed - should be access methods. 
- z$generic = c(createNamesMethod(type),
+
+                                        #XXX misnamed - should be access methods. 
+   z$generic = c(createNamesMethod(type),
                z$generic, a$generic,
                  # No need for the [[<- as $ does not need the copy
                createRFieldAccessors(type, get = TRUE, typeMap = typeMap, operator = "[[", genericOnly = TRUE, tu = tu))
 
 
-  z$rFunctions = c(z$rFunctions, a$rFunctions) 
+   z$rFunctions = c(z$rFunctions, a$rFunctions) 
 
-   # The C code that takes a pointer to the instance and copies field by field
-   # to an instance of the R class 
-  z$cRoutines = c(createCopyStruct(type, typeMap = typeMap), z$cRoutines, a$cRoutines)
+       # The C code that takes a pointer to the instance and copies field by field
+       # to an instance of the R class
+   copy = createCopyStruct(type, typeMap = typeMap)
+   z$cRoutines = c(copy, z$cRoutines, a$cRoutines)
+   names(z$cRoutines)[1] = copy@name
 
-   # R class for the structure in R, and the reference. 
-  z$classDefs =  defineStructClass(type, classDefs, typeMap = typeMap, defaultBaseClass)
+       # R class for the structure in R, and the reference. 
+   z$classDefs =  defineStructClass(type, classDefs, typeMap = typeMap, defaultBaseClass)
 
-  z$coerce = generateStructSetAs(type)
+   z$coerce = generateStructSetAs(type)
  
-   # Constructor for a new type.
-  z$newInst = generateStructCreation(type)
+       # Constructor for a new type.
+   z$newInst = generateStructCreation(type, addFinalizer = addFinalizer)
 
-  z$freeInst = createStructFree(type, typeMap = typeMap)
-  z$duplicate = createDuplicateStruct(type, typeMap = typeMap)
+   z$freeInst = createStructFree(type, typeMap = typeMap)
+   z$duplicate = createDuplicateStruct(type, typeMap = typeMap)
  
- structure(z, class = "CStructInterface")
+   structure(z, class = "CStructInterface")
 }
 
 createDuplicateStruct =
@@ -280,7 +283,7 @@ if(FALSE) {
 
 
 generateStructCreation =
-function(type, name = type@name, alloc = "calloc")
+function(type, name = type@name, alloc = "calloc", addFinalizer = TRUE)
 {
   decl = getNativeDeclaration("", type, character(), FALSE)
   rname = paste("R_new_", name, sep = "")
@@ -323,7 +326,7 @@ function(type, name = type@name, alloc = "calloc")
 
 
   structure(list(c = cdef,
-                 r = RFunctionDefinition(id, txt, c(fieldNames, ".finalizer"), c(.finalizer = "FALSE"))),
+                 r = RFunctionDefinition(id, txt, c(fieldNames, ".finalizer"), c(.finalizer = as.character(addFinalizer)))),
             class = "ConstructorCode")
 }
 
@@ -355,7 +358,13 @@ function(type, name = type@name, free = "free", typeMap = list())
      "{", 
      paste(decl, "* ans = NULL;"),
      paste("ans = (", decl, "* ) R_ExternalPtrAddr(val);"),  
-     paste(' if(ans) { fprintf(stderr, "freeing', name, ' %p\\n", ans); free(ans);}'),
+#     paste(' if(ans) { fprintf(stderr, "freeing', name, ' %p\\n", ans); free(ans);}'),
+     ' if(ans) {',
+     "#ifdef DEBUG_R_FINALIZERS",
+     paste('   fprintf(stderr, "freeing', name, ' %p\\n", ans);'),
+     "#endif",
+     '    free(ans);',
+     '}',     
      "}")
 
   free = c(externC, "SEXP",
@@ -364,7 +373,13 @@ function(type, name = type@name, free = "free", typeMap = list())
      paste(decl, "* ans = NULL;"),
      paste("ans = ", deref),
      "", 
-     paste(' if(ans) { fprintf(stderr, "freeing', name, ' %p\\n", ans); free(ans);}'),    
+#     paste(' if(ans) { fprintf(stderr, "freeing', name, ' %p\\n", ans); free(ans);}'),
+     ' if(ans) {',
+     "#ifdef DEBUG_R_FINALIZERS",
+     paste('   fprintf(stderr, "freeing', name, ' %p\\n", ans);'),
+     "#endif",
+     '    free(ans);',
+     '}',         
      "return(ScalarLogical(ans ? TRUE : FALSE));",
      "}")    
 

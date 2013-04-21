@@ -40,6 +40,11 @@ setMethod("convertValueToR",  c(parm = "intType"),
                    paste("ScalarInteger(", name, ")")
               })
 
+setMethod("convertValueToR",  c(parm = "unsignedIntType"),
+              function(name, parm, parameters, invoke = "", typeMap = list(), out = FALSE, helperInfo = NULL, ...) {
+                   paste("ScalarReal(", name, ")")
+              })
+
 
 setMethod("convertValueToR", c(parm = "EnumerationDefinition"),
               function(name, parm, parameters, invoke = "", typeMap = list(), out = FALSE, helperInfo = NULL, ...) {

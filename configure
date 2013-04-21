@@ -2508,6 +2508,10 @@ fi
 echo "`pwd`"
 echo "Native parser: $USE_NATIVE_TU_PARSER"
 
+if test -r NAMESPACE ; then
+ chmod +w NAMESPACE
+fi
+
 ac_config_files="$ac_config_files src/Makevars R/ConfigVars.R NAMESPACE"
 
 cat >confcache <<\_ACEOF
@@ -3521,6 +3525,8 @@ if test "$no_create" != yes; then
   # would make configure fail if this is the last instruction.
   $ac_cs_success || { (exit 1); exit 1; }
 fi
+
+chmod -w NAMESPACE
 
 
 

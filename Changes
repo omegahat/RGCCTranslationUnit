@@ -1,3 +1,8 @@
+0.7-0
+
+   *  Changed the signature of convertCharArrayToR() and convertDoubleArrayToR().
+      Old versions are there with _full appended to name.
+
 0.6-0
 
    *   Fix for real_cst converting the value to an integer.

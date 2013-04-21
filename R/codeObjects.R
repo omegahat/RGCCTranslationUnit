@@ -250,7 +250,8 @@ function(name, code, nargs = NA, declaration = getDeclaration(code), className =
   obj@code = if(formatCode) formatCode(code) else code
   obj@nargs = as.integer(nargs)
   obj@declaration = declaration
-  obj@prototype = paste("#ifdef __cplusplus",'extern "C"', getDeclaration(obj), "#endif", sep=" \n ", collapse=" ")
+    # do we need the  __cplusplus
+  obj@prototype = paste("#ifdef __cplusplus",'extern "C"', "#endif", getDeclaration(obj), sep=" \n ", collapse="")
     
   obj
 }

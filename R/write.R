@@ -94,7 +94,7 @@ setMethod("writeCode", "NativeInterfaceCode",
   #
   #Edited 12/28/2009 to add header capability
 setMethod("writeCode", "list",
-          function(obj, target, file = stdout(), ..., includes = character()) {
+          function(obj, target, file = stdout(), packages = character(), ..., includes = character()) {
 
             if(length(target) > 1)
               lapply(target, function(t) writeCode(obj, t, target = target, file = file, ..., includes = includes))
@@ -106,7 +106,7 @@ setMethod("writeCode", "list",
             if(!inherits(file, "connection")) {
               file = file(file, "w")
               if(target == "r")
-                cat("library(RAutoGenRunTime)\n", file = file)
+                addLoadPackages(packages, file)
               on.exit(close(file))
             } else if(!isOpen(file)) {
                file = open(file, "w")
@@ -170,12 +170,12 @@ function(obj, target, file = stdout(), ..., includes = character())
 })
 
 setMethod("writeCode", "ActiveBinding",
-function(obj, target, file = stdout(), ..., includes = character())
+function(obj, target, file = stdout(), packages = character(), ..., includes = character())
 {
   if(!inherits(file, "connection")) {
      file = file(file, "w")
      if(target == "r")
-       cat("library(RAutoGenRunTime)\n", file = file)
+       addLoadPackages(packages, file)
      on.exit(close(file))
    }
   if(target == "r")
@@ -184,16 +184,25 @@ function(obj, target, file = stdout(), ..., includes = character())
 })
 
 
+addLoadPackages =
+  # generate code to load the specified libaries.
+function(packages, file)
+{
+  sapply(sprintf("library(%s)\n", packages),
+           cat, file = file)
+}
+
+
 setOldClass("StructRClassDefinition")
 
 setMethod("writeCode", "StructRClassDefinition",
-function(obj, target, file = stdout(), ..., includes = character()
+function(obj, target, file = stdout(), packages = character(), ..., includes = character()
         )
 {
   if(!inherits(file, "connection")) {
      file = file(file, "w")
      if(target == "r")
-       cat("library(RAutoGenRunTime)\n", file = file)
+        addLoadPackages(packages, file)
      on.exit(close(file))
    }
   if(target == "r")
@@ -204,13 +213,13 @@ function(obj, target, file = stdout(), ..., includes = character()
 
 setMethod("writeCode", "CStructInterface",
 #Edited 12/28/2009 by gabe to add header functionality.
-function(obj, target, file = stdout(), ..., includes = character()
+function(obj, target, file = stdout(), packages = character(), ..., includes = character()
          ) # XXX '"RConverters.h"'))
 {
   if(!inherits(file, "connection")) {
      file = file(file, "w")
      if(target == "r")
-       cat("library(RAutoGenRunTime)\n", file = file)
+       addLoadPackages(packages, file)       
      on.exit(close(file))
    }
   
@@ -231,12 +240,12 @@ function(obj, target, file = stdout(), ..., includes = character()
        cat("exportClass(", paste(names(obj$classDefs), sep = ", "), ")\n", file = file, ...)
 #       cat("exportMethods('$', '$<-')\n", file = file, ...)
   } else if (TRUE) {  # Taking over from next else if(target == "native") - conslidate.
-    if (target == "native" || target == "header")
+    if (target %in% c("native", "header"))
       {
         if (length(includes))
           writeIncludes(includes, file, addConverters = FALSE)
-        sapply(obj$cRoutines, writeCode, file = file, target=target, ...)
-        sapply(obj$coerce$routines, writeCode, file=file, target=target,  ...)
+        sapply(obj$cRoutines, writeCode, file = file, target = target, ...)
+        sapply(obj$coerce$routines, writeCode, file=file, target = target,  ...)
         writeCode(obj$newInst$c, file= file, target = target, ...)
         sapply(obj$freeInst, writeCode, target = target, file = file, ...)
         writeCode(obj$duplicate$c, target = target, file = file, ...)
@@ -989,6 +998,6 @@ setOldClass("ArrayInterface")
 setMethod("writeCode", "ArrayInterface",
           function(obj, target, file = stdout(), header = FALSE, ..., includes = character())
   {
-    writeCode(unclass(obj), target=target, file=file,  header=header,
+    writeCode(unclass(obj), target=target, file=file,  header = header,
               includes = includes, ...)
   })

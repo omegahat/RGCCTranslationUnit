@@ -132,6 +132,12 @@ AC_SUBST(USE_PERL_TU_PARSER)
 echo "`pwd`"
 echo "Native parser: $USE_NATIVE_TU_PARSER"
 
+if test -r NAMESPACE ; then
+ chmod +w NAMESPACE
+fi
+
 AC_OUTPUT(src/Makevars R/ConfigVars.R NAMESPACE)
+chmod -w NAMESPACE
+
 
 
