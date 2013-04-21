@@ -517,6 +517,9 @@ function(node,  op, type = TRUEp, verbose = FALSE, addPrefix = FALSE)
 checkSource =
 function(src, files, allowBuiltIns = FALSE)
 {
+  if(is.function(files))
+    return(files(src))
+  
   if(!allowBuiltIns && (length(src) == 0 || length(grep("<built-in>", src))))
     return(FALSE)
 

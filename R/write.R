@@ -599,7 +599,7 @@ function(obj, target, file = stdout(), S3Classes = FALSE, ..., includes = charac
        defName = paste(els[1], "Values", sep = "")
 
        if(bitwise || !S3Classes)
-          cat("setClass('", name, "', contains = '", if(bitwise) "BitwiseValue" else "EnumValue", "')", "\n", sep = "", file = file)
+          cat("setClass('", name, "', representation(names = 'character'), contains = '", if(bitwise) "BitwiseValue" else "EnumValue", "')", "\n", sep = "", file = file)
        
        #XXX if the name has a :: in it, we are in trouble.
         #??? Really
@@ -672,7 +672,10 @@ function(obj, target, file = stdout(), S3Classes = FALSE, ..., includes = charac
      cat("\n#####################\n", file = file)
   } else if(tolower(target) == "native") {
      #cat(generateEnumCConverters(obj), file = file, ...)
+    writeCode(generateEnumCConverters(obj), target, file = file, ...)
+  } else if(tolower(target) == "header") {
     writeCode(generateEnumCConverters(obj), target, file = file, ...)    
+  
   } else if(tolower(target) == "namespace") {
       if(!S3Classes) {
         name = paste(name, collapse = "::")

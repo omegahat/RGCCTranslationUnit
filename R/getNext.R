@@ -91,7 +91,7 @@ function(p, files = character(),
      types = c("StructDefinition", "EnumerationDefinition")
   objs = objs[sapply(objs, inherits, types)]
 
-  if(length(files)) {
+  if(length(files) || is.function(files)) {
     if(exists(".parser", p)) {
       parser = p$.parser
         # Need to be able to get back to the node.

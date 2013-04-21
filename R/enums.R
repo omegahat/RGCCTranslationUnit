@@ -12,9 +12,13 @@ setMethod("generateEnumCConverters", c("EnumerationDefinition", routineName = "m
                 def@values = def@values[!dups]
 
               if(length(def@name) > 1) {
-                routineName = paste(def@name, collapse = "_")
-                names(def@values) = paste(def@name[1], names(def@values), sep = "::")
-                def@name = paste(def@name, collapse = "::")
+                if(is(def@name, "TypedefEnumerationName"))
+                  routineName = def@name[length(def@name)]
+                else {
+                  routineName = paste(def@name, collapse = "_")
+                  names(def@values) = paste(def@name[1], names(def@values), sep = "::")
+                  def@name = paste(def@name, collapse = "::")
+                }
               } else {
                 routineName = def@name
               }
@@ -22,21 +26,30 @@ setMethod("generateEnumCConverters", c("EnumerationDefinition", routineName = "m
               generateEnumCConverters(def, routineName, prefix, ...)
             })
 
+getEnumCTypeName =
+function(name)
+{
+   if(is(name, "TypedefEnumerationName"))
+     name[length(name)]
+   else
+     paste("enum", name)
+}
 
 setMethod("generateEnumCConverters",
           "GCC::Node::enumeral_type",
           function(def, routineName = NA, prefix = character(), ...)
             generateEnumCConverters(resolveType(def), routineName, prefix, ...))
 
+
 setMethod("generateEnumCConverters", c("EnumerationDefinition", "character"),
           function(def, routineName = NA, prefix = character(), ...) {
 
   funName = paste("Renum_convert_", routineName, sep = "")
   
-  toR = c(paste("SEXP ", funName, "(",  "enum ", def@name,  " val)", sep = ""),
+  toR = c(paste("SEXP ", funName, "(",  getEnumCTypeName(def@name),  " val)", sep = ""),
           "{",
           "const char *elName = NULL;",
-          "SEXP klass, ans, tmp;")
+          "SEXP klass, ans;")
   
   toR = c(toR, 
           c("switch(val) {",
@@ -44,14 +57,15 @@ setMethod("generateEnumCConverters", c("EnumerationDefinition", "character"),
 	              function(id) {
 	                paste("    case ", id, ":\n       ",  "elName = \"",  id, "\";\n     break;", collapse = "\n", sep = "")
 	              }),
-            "    deafult:",
+            "    default:",
             '\telName = "?";',
-	    "}\n\n"))
+	    "\t}\n\n"))
 
 
-  className = def@name
+  className = getRTypeName(def@name)
   toR = c(toR,
                "#if defined(USE_S4_ENUMS)", "",
+               "SEXP tmp",
                paste('PROTECT(klass = MAKE_CLASS("',  className, '"));', sep = ""),
                'PROTECT(ans = NEW(klass));',
                "PROTECT(tmp = ScalarInteger(val));",    
@@ -86,13 +100,13 @@ setMethod("generateEnumCConverters",
 
 
             funName = paste("R_bitwise_enum_convert", routineName, sep = "_")
-            valueIds  = if(length(def@name) > 1)
+            valueIds  = if(length(def@name) > 1 && !is(def@name, "TypedefEnumerationName"))
                            paste(prefix, names(def@values), sep = "::")
                          else
                            names(def@values)
             
             toR = c(paste("SEXP", funName, "(",
-                               "enum", paste(def@name, collapse = "::"), "val)"),
+                                     getEnumCTypeName(def@name), "val)"),
                      "{",
                      "  return(",
                      "     R_bitwise_enum_convert(val, ",
