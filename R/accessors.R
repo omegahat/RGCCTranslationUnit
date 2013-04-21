@@ -169,7 +169,7 @@ makeCFieldAccessorRoutine =
 function(fieldName, def, tu, funCall, hasCopy, deref, typeMap, thisDef, get) 
 {
       ftype = forceResolve( def@fields[[fieldName]]@type, tu)
-      fieldAccessor = paste("obj ->", fieldName)
+      fieldAccessor = paste("obj->", fieldName, sep = "")
 
       decls = character()
 
@@ -179,9 +179,9 @@ function(fieldName, def, tu, funCall, hasCopy, deref, typeMap, thisDef, get)
      if(!get)  {
             # So doing a set
         if(!useCopyCode)
-          decls = c(
-                    getNativeDeclaration("value", ftype, character()),
-                    convertRValue("value", "r_value", ftype, typeMap = typeMap)
+          decls = paste(
+                    getNativeDeclaration("value", ftype, character(), addSemiColon = FALSE),
+                    "=", convertRValue("value", "r_value", ftype, typeMap = typeMap), ";"
                    )
         else {
           decls = character() # Don't need
@@ -214,7 +214,7 @@ function(fieldName, def, tu, funCall, hasCopy, deref, typeMap, thisDef, get)
                      val = paste( " INTEGER(r_copy)[0] ?", val, ":", ref)
                   }
                   paste("return(", val, ");")
-             } else { # could  return the previous value, but that is useful in
+               } else { # could  return the previous value, but that is useful in
                       # x$foo = val because the $<- method must return x
 
                      # Move this to a setNativeValue method, but have to deal with the different 
@@ -222,10 +222,10 @@ function(fieldName, def, tu, funCall, hasCopy, deref, typeMap, thisDef, get)
                   if(useCopyCode)
                       getCopyFieldCode(fieldName, ftype, c(to = "obj", from ="r_value"))
                   else
-                       setNativeValue(ftype, structure(c("obj", fieldName), class = "StructField"),  
+                      setNativeValue(ftype, structure(c("obj", fieldName), class = "StructField"),  
                                          "value", typeMap)
-            },
-         "return(r_obj);",
+               },
+          if(!get) "return(r_obj);",
          "}")
 
                    

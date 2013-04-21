@@ -119,7 +119,8 @@ function(type, typeMap = list())
            getNativeDeclaration("ans", pt, const = FALSE),
            "SEXP r_ans;",
            "",
-           convertRValue("value", "r_value", pt, character(), typeMap = typeMap),
+             #XXX it appears that convertRValue does not assign to the value, so we do this here.
+           paste("value =", convertRValue("value", "r_value", pt, character(), typeMap = typeMap), ";"), 
            paste("ans = (", typeDecl, " *) malloc(sizeof(ans));"),
            "*ans = *value;",
            paste("r_ans =", convertValueToR("ans", pt, typeMap = typeMap), ";"),
@@ -196,7 +197,8 @@ function(type, classNames = c(type@name, getReferenceClassName(type)))
 
                        c(paste("tmp = GET_SLOT(r_from, Rf_install(\"", field ,"\"));", sep = ""),
                              # This is really convertRValue, i.e. from R to C but better copy the object.
-                         getCopyFieldCode(field, type@fields[[field]]@type, c(to = "ans", from = "tmp"))) # was  just the field, not the type
+                             # was  just the field, not the type
+                         getCopyFieldCode(field, type@fields[[field]]@type, c(to = "ans", from = "tmp")))
                     }),
              "return(ans);",
              "}",
@@ -238,16 +240,20 @@ setGeneric("getCopyFieldCode",
 
 setMethod("getCopyFieldCode", c("ANY", "ANY", "ANY"),
              function(fieldName, type, varNames, typeMap = list()) {
-                 convertRValue(paste(varNames["to"], fieldName, sep = "->"), varNames["from"], type, character(), typeMap = typeMap)
+                 lhs = paste(varNames["to"], fieldName, sep = "->")
+                 tmp = convertRValue(lhs, varNames["from"], type, character(), typeMap = typeMap)
+                 paste(lhs, "=", tmp)
              })
 
 setMethod("getCopyFieldCode", c(type = "ResolvedTypeReference"),
              function(fieldName, type, varNames, typeMap = list()) {
+
                getCopyFieldCode(fieldName, resolveType(type), varNames)
              })
 
 setMethod("getCopyFieldCode", c(type = "StructDefinition"),
              function(fieldName, type, varNames, typeMap = list()) {
+
               routine = paste("coerce", type@name, getReferenceClassName(type), sep = "_")
               paste(routine, "(", varNames["from"], ",", "&", varNames["to"], "->", fieldName, ");")
              })
@@ -456,7 +462,7 @@ function(def,  className = def@name, isClass = FALSE, typeMap = list())
 builtInClasses =  c("integer", "character", "numeric", "logical", "list", "raw")
 
 
-defineStructClass=
+defineStructClass =
   #
   #  for the given class
   #

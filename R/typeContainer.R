@@ -120,7 +120,8 @@ function(node)
 
 getNodeID.default =
 function(node)
-    stop("Not certain what we are dealing with here")
+  NA
+  #  stop("Not certain what we are dealing with here")
 
 getNodeID.NativeTUParserIndex =
 function(node)

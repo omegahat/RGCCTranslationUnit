@@ -179,7 +179,7 @@ setMethod("convertValueToR", c(parm = "ArrayType"),
                      # this is for controlling the copying of the elements. If these are builtin primitive types
                      # then we can only copy them so hasCopy is FALSE.
                  hasCopy = !is(parm@type, "BuiltinPrimitiveType")
-                 hasCopy = TRUE #XXX
+                 hasCopy = FALSE # TRUE #XXX
                  
                        # If we don't know the length, we have problems.
                  if(length(parm@length) && is.na(parm@length)) 
@@ -191,7 +191,9 @@ setMethod("convertValueToR", c(parm = "ArrayType"),
                        # if we can get a reference to the elements i.e. hasCopy is TRUE
                        # then we add a 1. 
                        # Then we give the start and end values.
-                 paste(getCopyArrayName(parm), "(", paste(dims, collapse = ", "), ",", name, if(hasCopy) ", 1", ", 0,", parm@length - 1, ")")
+ #XXX add if(hasCopy) ", 1"
+ #XXX
+                 paste(getCopyArrayName(parm), "(", name, ",", paste(dims, collapse = ", "), ", 0,", parm@length - 1, ")")
 #                   stop("Need training on converting ArrayType to R for this particular type ", parm@type@name)
               })
 

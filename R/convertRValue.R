@@ -34,7 +34,7 @@ setMethod("convertRValue", c(parm = "SEXP"),
 
 setMethod("convertRValue", c(parm = "intType"),
               function(to, name, parm, parameters, typeMap = list(), helperInfo = NULL) {
-                     paste("asInteger(", name, ")")
+                     paste("asInteger(", name, ");")
               })
 
 
@@ -234,7 +234,7 @@ setMethod("convertRValue", c(parm = "ArrayType"),
                     "   }",
                     "  }")
                   return(structure(code, class = c("StatementBlock", "Statement")))                  
-                }
+                } 
                 
                txt = paste('DEREF_REF_PTR(', name, ", ", getNativeDeclaration("", parm@type, , FALSE, FALSE), ')')
                ptype = new("PointerType", type = parm@type, typeName = parm@type@name, depth = as.integer(1))
@@ -244,7 +244,7 @@ setMethod("convertRValue", c(parm = "ArrayType"),
 
                setEls = if(is(parm@type, "BuiltinPrimitiveType")) {
                                           #  && Make the test check the types are not the same                      != ) 
-                           paste("  ", c("int i;",  copyRArrayElementsToNative(parm, to, name)))
+                           paste("  ", copyRArrayElementsToNative(parm, to, name))
                         } else
                            c(getNativeDeclaration("_tmp", parm),
                              paste("_tmp = ",  txt, ";"),                             

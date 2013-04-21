@@ -109,7 +109,7 @@ function(tu = NULL, gvars = getGlobalVariables(tu, files),
                els = sapply(els[["val"]], getValue)
                if(is.character(els))
                  els = dQuote(els)
-               paste("`", id, "`", ' <- c(', paste(els, collapse = ", "),  ")\n", sep = "")
+               paste(backtick(id), ' <- c(', paste(els, collapse = ", "),  ")\n", sep = "")
              }
             else 
               NA  #XXX compute more here.

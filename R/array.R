@@ -387,7 +387,7 @@ function(type, to, name)
 {
   typeName = type@type@name
   if(typeName == "char")
-    sprintf("convertRCharacterToCharArray(%s, %s, %d);", to, name, as.integer(if(is.na(type@length)) -1 else type@length))
+     sprintf("convertRCharacterToCharArray(%s, %s, %d);", to, name, as.integer(if(is.na(type@length)) -1 else type@length))
   else {
      accessor = with(BuiltinTypeTable, Caccessor[C == typeName])
      if(length(accessor) == 0) {
@@ -397,7 +397,8 @@ function(type, to, name)
           warning("Couldn't find appropriate accessor for array of type ", typeName)
 
      }
-     c(paste("for(i = 0; i <", type@length, "; i++)"),
+     c("int i;",
+       paste("for(i = 0; i <", type@length, "; i++)"),
              #??? should we put a cast here or leave the compiler to complain
        paste("    ", to, "[i] =", accessor, "(", name, ")[i];"))
   }

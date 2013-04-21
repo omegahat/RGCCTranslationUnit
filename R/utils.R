@@ -183,9 +183,14 @@ function(fileName, error = TRUE)
   
 
 
-backquote =
+backtick = backquote =
 function(x)
- paste("`", x, "`", sep = "")
+{
+  i = grepl('(^[0-9]| )', x)
+  if(any(i))
+     x[i] = paste("`", x[i], "`", sep = "")
+  x
+}
 
 
 ######################################################################

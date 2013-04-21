@@ -688,9 +688,6 @@ setMethod("declaration", "CRoutineDefinition",
              })
      
 
-backtick =
-function(x)  
-  paste("`", x, "`", sep = "")
 
 setMethod("writeCode", "ResolvedRoutineList", 
 function(obj, target, file = stdout(), ..., includes = character()

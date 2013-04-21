@@ -1,9 +1,9 @@
 
 FunctionPointer =
-function(funDef, alias = character())
+function(funDef, alias = character(), ans = new("FunctionPointer"))
 {
  #XXX typename
-  ans = new("FunctionPointer", name = funDef@name)
+  ans@name = funDef@name
   ans@returnType = funDef@returnType
 
   parms = funDef@parameters
