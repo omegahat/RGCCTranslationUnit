@@ -249,7 +249,7 @@ public:
     std::vector<GCCNode *> nodes;    
 
     void addOperand(std::string val);
-    GCCNode * getNode(int index);
+    GCCNode * getNode(unsigned int index);
 };
 
 class GCCListNode : public OperandNode {

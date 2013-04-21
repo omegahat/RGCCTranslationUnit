@@ -117,6 +117,7 @@ GeneralGCCTUParser::parseNode(const char *lines)
           (which[TWO_WORD_NOTE] = twoWordNoteRegExpr->Consume(&input, &op))  ||
           (which[OP] = opRegExpr->Consume(&input, &var, &value))  ||
           (which[REAL_VALUE] = realValueRE->Consume(&input, &value)) ||
+          (which[REAL_VALUE] = realValueInf->Consume(&input, &value)) ||  
           (which[NUM_TOKEN] = numTokenRegExpr->Consume(&input, &var, &value)) ||
           (which[TOKEN] = tokenRegExpr->Consume(&input, &var, &value)) ||
           (which[BARE_WORD] = bareWordRegExpr->Consume(&input, &var)) 
@@ -317,7 +318,7 @@ isDuplicateField(const char *key)
         "note", "val",  "idx",  "body", "base", "accs", "binf", "spec"
     };
 
-    for(int i = 0; i < sizeof(names)/sizeof(names[0]); i++)
+    for(unsigned int i = 0; i < sizeof(names)/sizeof(names[0]); i++)
         if(strcmp(key, names[i]) == 0)
             return(true);
 
@@ -355,7 +356,7 @@ OperandNode::addOperand(std::string value)
 }
 
 GCCNode * 
-OperandNode::getNode(int pos)
+OperandNode::getNode(unsigned int pos)
 {
     GCCNode *ans = NULL;
     if(nodes.size()  == 0 && operands.size() > 0)

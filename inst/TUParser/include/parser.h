@@ -40,12 +40,13 @@ public:
            /* name <space>:<space> either built-in:0 or @digits<space>   */
        /* 3rd condition is for things like strg: basic_ios::clear 
           4th is for numbers as in real_cst    valu: 0.0  XXX  need to handle scientific notation. */
-       int i = 0;
+       unsigned int i = 0;
         regexps[BARE_WORD] = tokenRegExpr = new pcrecpp::RE("(\\w+)\\s*:\\s+(<built-in>:0|[@\\w-]+::[@\\w-]+|[@\\w-]+|[0-9]*(\\.[0-9]+)?)\\s*");
         regexps[NUM_TOKEN] = numTokenRegExpr = new pcrecpp::RE("(\\w+)\\s*:\\s+([0-9]+\\.?[0-9]+([eE][+-]?[0-9]+)?\\s*");
 
         regexps[STRING] = stringRE = new pcrecpp::RE("strg:\\s+(.*)\\s+lngt:\\s+([0-9]+)\\s*");
         realValueRE = new pcrecpp::RE("valu:\\s+([0-9]+\\.?[0-9]+([eE][+-]?[0-9]+)?)\\s*");
+	realValueInf = new pcrecpp::RE("valu:\\s+([-+]Inf)\\s*"); 
 
 //	tokenRegExpr = new pcrecpp::RE("((srcp):\\s(\\w+:[0-9]+|<built-in>:0)|(\\w+)\\s*:\\s([@\\w]+))\\s*");
         regexps[i++] = startNodeRE = new pcrecpp::RE("^@(\\d+)\\s+(\\w+)\\s*"); //xxx not used yet.
@@ -59,7 +60,7 @@ public:
 	regexps[i++] = bareWordRegExpr = new pcrecpp::RE("\\s*([a-zA-Z]+)\\s+");    
 	regexps[i++] = noteOpMemberRE = new pcrecpp::RE("\\s*note: operator\\s+note:\\s*member\\s*");    
 
-	if(i > sizeof(regexps)/sizeof(regexps[0]))
+	if(i >= sizeof(regexps)/sizeof(regexps[0]))
 	    fprintf(stderr, "Too many regexps\n");
    }
 
@@ -86,7 +87,7 @@ public:
 protected:
    pcrecpp::RE * regexps[100];//ignre now.
 
-   pcrecpp::RE *tokenRegExpr, *numTokenRegExpr, *stringRE, *realValueRE;
+   pcrecpp::RE *tokenRegExpr, *numTokenRegExpr, *stringRE, *realValueRE, *realValueInf;
    pcrecpp::RE *startNodeRE;
    pcrecpp::RE *srcRegExpr, *opRegExpr, 
        *operatorNoteRegExpr, *noteOpMemberRE, 
